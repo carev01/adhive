@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Backend API server
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ad-catalog-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATA_DIR=/app/data
+      - LOG_LEVEL=info
+    volumes:
+      - ad-catalog-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend development server
+  frontend:
+    image: node:20-alpine
+    container_name: ad-catalog-frontend
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://app:8080
+    command: >
+      sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # (Optional) SQLite backup with litestream
+  # Uncomment for production with persistence
+  # litestream:
+  #   image: litestream/litestream:latest
+  #   container_name: ad-catalog-backup
+  #   volumes:
+  #     - ad-catalog-data:/data
+  #     - ./backups:/backups
+  #   environment:
+  #     - LITESTREAM_REPLICA_URL=file:/backups/db
+  #   command: replicate /data/ad-catalog.db
+  #   depends_on:
+  #     - app
+
+volumes:
+  ad-catalog-data:
+    driver: local
+
+networks:
+  default:
+    name: ad-catalog-network

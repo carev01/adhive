@@ -1,0 +1,194 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/carev01/adhive/internal/model"
+	"github.com/carev01/adhive/internal/repository"
+	"github.com/gin-gonic/gin"
+)
+
+// InteractionHandler handles interaction HTTP requests
+type InteractionHandler struct {
+	interactionRepo *repository.InteractionRepository
+	entryRepo       *repository.EntryRepository
+}
+
+// NewInteractionHandler creates a new InteractionHandler
+func NewInteractionHandler(interactionRepo *repository.InteractionRepository, entryRepo *repository.EntryRepository) *InteractionHandler {
+	return &InteractionHandler{
+		interactionRepo: interactionRepo,
+		entryRepo:       entryRepo,
+	}
+}
+
+// InteractionResponse represents the API response for an interaction
+type InteractionResponse struct {
+	ID          string  `json:"id"`
+	EntryID     string  `json:"entry_id"`
+	UserID      string  `json:"user_id"`
+	Tried       bool    `json:"tried"`
+	Score       *int    `json:"score,omitempty"`
+	Comments    string  `json:"comments,omitempty"`
+	ContactedAt *string `json:"contacted_at,omitempty"`
+	PurchasedAt *string `json:"purchased_at,omitempty"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+}
+
+// Get handles GET /api/v1/entries/:id/interaction
+func (h *InteractionHandler) Get(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	entryID := c.Param("id")
+
+	// Verify entry exists and belongs to user
+	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
+	if err != nil || entry == nil || entry.UserID != userID {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Not Found",
+			Status: http.StatusNotFound,
+			Detail: "entry not found",
+		})
+		return
+	}
+
+	// Get interaction
+	interaction, err := h.interactionRepo.GetByEntryAndUser(c.Request.Context(), entryID, userID)
+	if err != nil {
+		// No interaction found - return empty response
+		c.JSON(http.StatusOK, nil)
+		return
+	}
+
+	c.JSON(http.StatusOK, interactionToResponse(interaction))
+}
+
+// Upsert handles PUT /api/v1/entries/:id/interaction
+func (h *InteractionHandler) Upsert(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	entryID := c.Param("id")
+
+	// Verify entry exists and belongs to user
+	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
+	if err != nil || entry == nil || entry.UserID != userID {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Not Found",
+			Status: http.StatusNotFound,
+			Detail: "entry not found",
+		})
+		return
+	}
+
+	// Parse input
+	var input model.InteractionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Bad Request",
+			Status: http.StatusBadRequest,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	// Validate
+	if !input.Validate() {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Bad Request",
+			Status: http.StatusBadRequest,
+			Detail: "score must be between 0 and 5",
+		})
+		return
+	}
+
+	// Upsert interaction
+	interaction, err := h.interactionRepo.Upsert(c.Request.Context(), entryID, userID, &input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Internal Server Error",
+			Status: http.StatusInternalServerError,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, interactionToResponse(interaction))
+}
+
+// Delete handles DELETE /api/v1/entries/:id/interaction
+func (h *InteractionHandler) Delete(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	entryID := c.Param("id")
+
+	err := h.interactionRepo.Delete(c.Request.Context(), entryID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Internal Server Error",
+			Status: http.StatusInternalServerError,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func interactionToResponse(i *model.Interaction) *InteractionResponse {
+	if i == nil {
+		return nil
+	}
+	resp := &InteractionResponse{
+		ID:        i.ID,
+		EntryID:   i.EntryID,
+		UserID:    i.UserID,
+		Tried:     i.Tried,
+		Score:     i.Score,
+		Comments:  i.Comments,
+		CreatedAt: i.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: i.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	if i.ContactedAt != nil {
+		t := i.ContactedAt.Format("2006-01-02T15:04:05Z")
+		resp.ContactedAt = &t
+	}
+	if i.PurchasedAt != nil {
+		t := i.PurchasedAt.Format("2006-01-02T15:04:05Z")
+		resp.PurchasedAt = &t
+	}
+	return resp
+}

@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.svelte-kit/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+!README.md
+docs/
+
+# Test coverage
+coverage.out
+*.out
+
+# Temporary
+tmp/
+temp/
+*.log
