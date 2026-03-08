@@ -148,6 +148,13 @@ func (h *EntryHandler) List(c *gin.Context) {
 	status := c.Query("status")
 	excludeTried := c.Query("exclude_tried") == "true"
 	search := c.Query("search")
+	dateFrom := c.Query("date_from")
+	dateTo := c.Query("date_to")
+	source := c.Query("source")
+	sortBy := c.DefaultQuery("sort_by", "created_at")
+	sortOrder := c.DefaultQuery("sort_order", "desc")
+	hasInteraction := c.Query("has_interaction") == "true"
+	minScore, _ := strconv.Atoi(c.Query("min_score"))
 
 	if page < 1 {
 		page = 1
@@ -157,11 +164,18 @@ func (h *EntryHandler) List(c *gin.Context) {
 	}
 
 	filter := &model.EntryFilter{
-		Page:   page,
-		Limit:  limit,
-		TagID:        tagID,
-		ExcludeTried: excludeTried,
-		Search: search,
+		Page:            page,
+		Limit:           limit,
+		TagID:           tagID,
+		ExcludeTried:    excludeTried,
+		Search:          search,
+		DateFrom:        dateFrom,
+		DateTo:          dateTo,
+		Source:          source,
+		SortBy:          sortBy,
+		SortOrder:       sortOrder,
+		HasInteraction:  hasInteraction,
+		MinScore:        minScore,
 	}
 	if status != "" {
 		filter.Status = model.ArchiveStatus(status)
@@ -207,6 +221,33 @@ func (h *EntryHandler) List(c *gin.Context) {
 	})
 }
 
+// Sources handles GET /api/v1/entries/sources
+func (h *EntryHandler) Sources(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	sources, err := h.entryRepo.GetUserSources(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Internal Server Error",
+			Status: http.StatusInternalServerError,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, map[string][]string{"sources": sources})
+}
+
 // Create handles POST /api/v1/entries
 func (h *EntryHandler) Create(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -231,28 +272,6 @@ func (h *EntryHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Check for duplicate URL for this user
-	ctx := c.Request.Context()
-	existingEntry, err := h.entryRepo.FindByURL(ctx, userID, req.URL)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
-		return
-	}
-	if existingEntry != nil {
-		c.JSON(http.StatusConflict, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Conflict",
-			Status: http.StatusConflict,
-			Detail: "This ad is already in your catalog",
-		})
-		return
-	}
-
 	entry := &model.CatalogEntry{
 		ID:            uuid.New().String(),
 		UserID:        userID,
@@ -264,7 +283,7 @@ func (h *EntryHandler) Create(c *gin.Context) {
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
 
-	err = h.entryRepo.Create(ctx, entry)
+	err := h.entryRepo.Create(c.Request.Context(), entry)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Type:   "about:blank",

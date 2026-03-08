@@ -207,6 +207,12 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 		return
 	}
 
+	// Check manual mode - for Playwright browser configuration
+	manualMode := w.consumeManualCaptureRequest(entryID)
+
+	// Note: Imported entries are excluded from automatic polling via FindPendingForArchiving query
+	// Manual refresh calls QueueJob directly, so no need to skip here
+
 	entry.ArchiveStatus = model.ArchiveStatusPending
 	if err := w.entryRepo.Update(ctx, entry); err != nil {
 		log.Printf("Error updating entry status: %v", err)
@@ -220,7 +226,7 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 
 	var capture *service.PlaywrightResult
 	if w.usePlaywright {
-		manualMode := w.consumeManualCaptureRequest(entryID)
+		// manualMode already consumed above
 		if manualMode {
 			result, err := w.playwrightService.Scrape(ctx, entry.URL, map[string]interface{}{
 				"waitFor":         "networkidle",

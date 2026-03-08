@@ -2,25 +2,44 @@
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
   import { afterNavigate } from '$app/navigation';
-  import { fetchEntries, fetchTags, fetchRandomEntry, loading, error, type Entry, type Tag } from '$lib/api/client';
+  import { fetchEntries, fetchTags, fetchRandomEntry, fetchSources, loading, error, type Entry, type Tag } from '$lib/api/client';
 
+  // Core state
   let entries: Entry[] = [];
   let tags: Tag[] = [];
+  let sources: string[] = [];
+  
+  // Filter state
   let selectedTag = '';
   let searchQuery = '';
+  let excludeTried = false;
+  let statusFilter = '';
+  let dateFrom = '';
+  let dateTo = '';
+  let sourceFilter = '';
+  
+  // Interaction filters
+  let hasInteraction = false;
+  let minScore = 0;
+  
+  // Sort state
+  let sortBy = 'created_at-desc';
+  
+  // UI state
   let page = 1;
   let total = 0;
   let limit = 20;
   let searchTimeout: ReturnType<typeof setTimeout>;
-  let excludeTried = false;
   let randomLoading = false;
   let listPollTimer: ReturnType<typeof setInterval> | null = null;
+  let showFilters = false;
 
   // Reactive
   $: totalPages = Math.ceil(total / limit);
+  $: hasActiveFilters = statusFilter || dateFrom || dateTo || sourceFilter || hasInteraction || minScore > 0;
 
   onMount(async () => {
-    await loadTags();
+    await Promise.all([loadTags(), loadSources()]);
     await loadEntries();
     startListPolling();
   });
@@ -44,7 +63,18 @@
     }
   }
 
+  async function loadSources() {
+    try {
+      sources = await fetchSources();
+    } catch (e) {
+      console.error('Failed to load sources:', e);
+    }
+  }
+
   async function loadEntries() {
+    // Parse sort value
+    const [sortField, sortDir] = sortBy.split('-') as [string, string];
+    
     loading.set(true);
     error.set(null);
     try {
@@ -53,7 +83,15 @@
         limit,
         tag: selectedTag || undefined,
         search: searchQuery || undefined,
-        exclude_tried: excludeTried
+        exclude_tried: excludeTried,
+        status: statusFilter || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        source: sourceFilter || undefined,
+        sort_by: sortField as 'created_at' | 'updated_at' | 'title',
+        sort_order: sortDir as 'asc' | 'desc',
+        has_interaction: hasInteraction || undefined,
+        min_score: minScore > 0 ? minScore : undefined,
       });
       entries = result.entries;
       total = result.total;
@@ -74,6 +112,57 @@
 
   function handleTagFilter(tagId: string) {
     selectedTag = tagId;
+    page = 1;
+    loadEntries();
+  }
+
+  function handleFilterChange() {
+    page = 1;
+    loadEntries();
+  }
+
+  function handleSortChange() {
+    // Parse sort value (format: "field-direction")
+    const [field, direction] = sortBy.split('-') as [string, string];
+    page = 1;
+    loadEntriesWithSort(field as 'created_at' | 'updated_at' | 'title', direction as 'asc' | 'desc');
+  }
+
+  async function loadEntriesWithSort(field: 'created_at' | 'updated_at' | 'title', direction: 'asc' | 'desc') {
+    loading.set(true);
+    error.set(null);
+    try {
+      const result = await fetchEntries({
+        page,
+        limit,
+        tag: selectedTag || undefined,
+        search: searchQuery || undefined,
+        exclude_tried: excludeTried,
+        status: statusFilter || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        source: sourceFilter || undefined,
+        sort_by: field,
+        sort_order: direction,
+        has_interaction: hasInteraction || undefined,
+        min_score: minScore > 0 ? minScore : undefined,
+      });
+      entries = result.entries;
+      total = result.total;
+    } catch (e: any) {
+      error.set(e.message);
+    } finally {
+      loading.set(false);
+    }
+  }
+
+  function clearFilters() {
+    statusFilter = '';
+    dateFrom = '';
+    dateTo = '';
+    sourceFilter = '';
+    hasInteraction = false;
+    minScore = 0;
     page = 1;
     loadEntries();
   }
@@ -151,8 +240,8 @@
     </a>
   </div>
 
-  <!-- Search & Filters -->
-  <div class="bg-white dark:bg-slate-800 shadow rounded-lg mb-6 p-4">
+  <!-- Search & Quick Filters -->
+  <div class="bg-white dark:bg-slate-800 shadow rounded-lg mb-4 p-4">
     <div class="flex flex-col sm:flex-row gap-4">
       <!-- Search -->
       <div class="flex-1">
@@ -169,13 +258,13 @@
             bind:value={searchQuery}
             on:input={handleSearch}
             placeholder="Search entries..."
-            class="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md leading-5 bg-white dark:bg-slate-700 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:placeholder-slate-400 dark:focus:placeholder-slate-500 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900 dark:text-white"
+            class="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md leading-5 bg-white dark:bg-slate-700 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-slate-900 dark:text-white"
           />
         </div>
       </div>
       
       <!-- Tag Filter -->
-      <div class="sm:w-48">
+      <div class="sm:w-40">
         <select
           bind:value={selectedTag}
           on:change={() => handleTagFilter(selectedTag)}
@@ -188,6 +277,38 @@
         </select>
       </div>
 
+      <!-- Sort Dropdown -->
+      <div class="sm:w-48">
+        <select
+          bind:value={sortBy}
+          on:change={handleSortChange}
+          class="block w-full py-2 pl-3 pr-10 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+        >
+          <option value="created_at-desc">Date Added (Newest)</option>
+          <option value="created_at-asc">Date Added (Oldest)</option>
+          <option value="title-asc">Title (A-Z)</option>
+          <option value="title-desc">Title (Z-A)</option>
+          <option value="updated_at-desc">Last Updated (Newest)</option>
+          <option value="updated_at-asc">Last Updated (Oldest)</option>
+        </select>
+      </div>
+
+      <!-- Toggle Filters Button -->
+      <button
+        on:click={() => showFilters = !showFilters}
+        class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 text-sm font-medium"
+      >
+        <svg class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        Filters
+        {#if hasActiveFilters}
+          <span class="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            Active
+          </span>
+        {/if}
+      </button>
+
       <!-- Random Pick -->
       <div class="flex items-center gap-2">
         <label class="flex items-center gap-2 text-sm cursor-pointer {excludeTried ? 'text-purple-400 font-medium' : 'text-slate-600 dark:text-slate-400'}">
@@ -195,19 +316,14 @@
             type="checkbox" 
             bind:checked={excludeTried}
             on:change={() => loadEntries()}
-            class="rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
+            class="rounded border-slate-300 dark:border-slate-600 text-purple-600 dark:text-purple-400 focus:ring-purple-500 dark:focus:ring-purple-400 bg-white dark:bg-slate-700"
           />
           Exclude tried
-          {#if excludeTried}
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
-              Active
-            </span>
-          {/if}
         </label>
         <button
           on:click={handleRandomPick}
           disabled={randomLoading}
-          class="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+          class="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
         >
           {#if randomLoading}
             <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -221,7 +337,183 @@
         </button>
       </div>
     </div>
+
+    <!-- Expanded Filters Panel -->
+    {#if showFilters}
+      <div class="mt-4 pt-4 border-t border-slate-200">
+        <div class="flex flex-col sm:flex-row gap-4">
+          <!-- Status Filter -->
+          <div class="sm:w-40">
+            <label for="status-filter" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Archive Status</label>
+            <select
+              id="status-filter"
+              bind:value={statusFilter}
+              on:change={handleFilterChange}
+              class="block w-full py-2 pl-3 pr-10 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+          <!-- Source Filter -->
+          <div class="sm:w-48">
+            <label for="source-filter" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Source</label>
+            <select
+              id="source-filter"
+              bind:value={sourceFilter}
+              on:change={handleFilterChange}
+              class="block w-full py-2 pl-3 pr-10 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+            >
+              <option value="">All Sources</option>
+              {#each sources as source}
+                <option value={source}>{source}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- Date From -->
+          <div class="sm:w-40">
+            <label for="date-from" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Date From</label>
+            <input
+              type="date"
+              id="date-from"
+              bind:value={dateFrom}
+              on:change={handleFilterChange}
+              class="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <!-- Date To -->
+          <div class="sm:w-40">
+            <label for="date-to" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Date To</label>
+            <input
+              type="date"
+              id="date-to"
+              bind:value={dateTo}
+              on:change={handleFilterChange}
+              class="block w-full py-2 px-3 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+            />
+          </div>
+
+          <!-- Has Interaction Toggle -->
+          <div class="flex items-center">
+            <label class="flex items-center gap-2 text-sm cursor-pointer text-slate-700 dark:text-slate-300">
+              <input 
+                type="checkbox" 
+                bind:checked={hasInteraction}
+                on:change={handleFilterChange}
+                class="rounded border-slate-300 dark:border-slate-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-700"
+              />
+              Has Interaction
+            </label>
+          </div>
+
+          <!-- Min Score Selector -->
+          <div class="sm:w-40">
+            <label for="min-score" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Min Score</label>
+            <select
+              id="min-score"
+              bind:value={minScore}
+              on:change={handleFilterChange}
+              class="block w-full py-2 pl-3 pr-10 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+            >
+              <option value={0}>Any</option>
+              <option value={1}>1+ ⭐</option>
+              <option value={2}>2+ ⭐</option>
+              <option value={3}>3+ ⭐</option>
+              <option value={4}>4+ ⭐</option>
+              <option value={5}>5 ⭐</option>
+            </select>
+          </div>
+
+          <!-- Clear Filters Button -->
+          {#if hasActiveFilters}
+            <div class="flex items-end">
+              <button
+                on:click={clearFilters}
+                class="inline-flex items-center px-3 py-2 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 text-sm font-medium"
+              >
+                <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear Filters
+              </button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
   </div>
+
+  <!-- Active Filters Summary -->
+  {#if hasActiveFilters}
+    <div class="mb-4 flex flex-wrap gap-2">
+      {#if statusFilter}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+          Status: {statusFilter}
+          <button on:click={() => { statusFilter = ''; handleFilterChange(); }} class="ml-1.5 hover:text-blue-900 dark:hover:text-blue-100">
+            <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </span>
+      {/if}
+      {#if sourceFilter}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+          Source: {sourceFilter}
+          <button on:click={() => { sourceFilter = ''; handleFilterChange(); }} class="ml-1.5 hover:text-green-900 dark:hover:text-green-100">
+            <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </span>
+      {/if}
+      {#if dateFrom}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+          From: {dateFrom}
+          <button on:click={() => { dateFrom = ''; handleFilterChange(); }} class="ml-1.5 hover:text-purple-900 dark:hover:text-purple-100">
+            <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </span>
+      {/if}
+      {#if dateTo}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+          To: {dateTo}
+          <button on:click={() => { dateTo = ''; handleFilterChange(); }} class="ml-1.5 hover:text-purple-900 dark:hover:text-purple-100">
+            <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </span>
+      {/if}
+      {#if hasInteraction}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+          Has Interaction
+          <button on:click={() => { hasInteraction = false; handleFilterChange(); }} class="ml-1.5 hover:text-indigo-900 dark:hover:text-indigo-100">
+            <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </span>
+      {/if}
+      {#if minScore > 0}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+          Min Score: {minScore}+ ⭐
+          <button on:click={() => { minScore = 0; handleFilterChange(); }} class="ml-1.5 hover:text-amber-900 dark:hover:text-amber-100">
+            <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+        </span>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Loading State -->
   {#if $loading}
@@ -229,7 +521,7 @@
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>
   {:else if $error}
-    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
       {$error}
     </div>
   {:else if entries.length === 0}
@@ -238,7 +530,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
       <h3 class="mt-2 text-sm font-medium text-slate-900 dark:text-white">No entries</h3>
-      <p class="mt-1 text-sm text-slate-500">Get started by adding your first entry.</p>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Get started by adding your first entry.</p>
       <div class="mt-6">
         <a href="/entries/new" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
           Add Entry
@@ -258,7 +550,7 @@
             {#if entry.thumbnail_path}
               <img src="{entry.thumbnail_path}?t={entry.updated_at}" alt={entry.title} class="w-full h-full object-cover" />
             {:else}
-              <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             {/if}

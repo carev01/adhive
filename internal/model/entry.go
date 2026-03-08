@@ -33,6 +33,7 @@ type CatalogEntry struct {
 	CreatedAt                 time.Time        `json:"created_at"`
 	UpdatedAt                 time.Time        `json:"updated_at"`
 	LastCheckedAt             *time.Time       `json:"last_checked_at"`
+	ImportedFrom              string           `json:"imported_from" gorm:"type:varchar(50)"`
 }
 
 // TableName specifies the table name for GORM
@@ -64,12 +65,19 @@ type EntryUpdateInput struct {
 
 // EntryFilter represents filter options for querying entries (matches handler expectations)
 type EntryFilter struct {
-	Page        int
-	Limit       int
-	TagID       string
-	Search      string
-	Status      ArchiveStatus
-	ExcludeTried bool
+	Page          int
+	Limit         int
+	TagID         string
+	Search        string
+	Status        ArchiveStatus
+	ExcludeTried  bool
+	DateFrom      string
+	DateTo        string
+	Source        string
+	SortBy        string
+	SortOrder     string
+	HasInteraction bool // Filter to only entries with interactions
+	MinScore      int   // Minimum score filter (0-5)
 }
 
 type EntryListResult struct {

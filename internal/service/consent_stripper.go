@@ -43,6 +43,10 @@ func DefaultSelectorGroups() []SelectorGroup {
 				`div[class*="age-verification"]`,
 				// fatalmodel.com — "Conteúdo adulto" modal with "Concordo" button
 				`div.fm-new-visitor-modal`,
+				// splove.com.br — "Acesso Restrito a Maiores de 18 Anos" overlay
+				`div.fixed.inset-0.flex.items-center.justify-center.z-50`,
+				`div.fixed.inset-0.flex.items-center.justify-center > div.bg-white.rounded-xl`,
+				`div[style*="fixed"][style*="inset-0"] > div.bg-white.rounded-xl`,
 			},
 		},
 		{

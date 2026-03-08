@@ -78,6 +78,13 @@ export async function fetchEntries(params: {
   search?: string;
   status?: string;
   exclude_tried?: boolean;
+  date_from?: string;
+  date_to?: string;
+  source?: string;
+  sort_by?: 'created_at' | 'updated_at' | 'title';
+  sort_order?: 'asc' | 'desc';
+  has_interaction?: boolean;
+  min_score?: number;
 } = {}): Promise<EntryListResponse> {
   const searchParams = new URLSearchParams();
   if (params.page) searchParams.set('page', params.page.toString());
@@ -86,6 +93,13 @@ export async function fetchEntries(params: {
   if (params.search) searchParams.set('search', params.search);
   if (params.status) searchParams.set('status', params.status);
   if (params.exclude_tried) searchParams.set('exclude_tried', params.exclude_tried.toString());
+  if (params.date_from) searchParams.set('date_from', params.date_from);
+  if (params.date_to) searchParams.set('date_to', params.date_to);
+  if (params.source) searchParams.set('source', params.source);
+  if (params.sort_by) searchParams.set('sort_by', params.sort_by);
+  if (params.sort_order) searchParams.set('sort_order', params.sort_order);
+  if (params.has_interaction) searchParams.set('has_interaction', params.has_interaction.toString());
+  if (params.min_score) searchParams.set('min_score', params.min_score.toString());
 
   const response = await fetch(`${API_BASE}/entries?${searchParams}`, {
     headers: {
@@ -99,6 +113,23 @@ export async function fetchEntries(params: {
   }
 
   return response.json();
+}
+
+// Sources API - fetch unique sources/domains from user's entries
+export async function fetchSources(): Promise<string[]> {
+  const response = await fetch(`${API_BASE}/entries/sources`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sources: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.sources || [];
 }
 
 export async function fetchEntry(id: string): Promise<Entry> {
@@ -128,17 +159,7 @@ export async function createEntry(url: string): Promise<Entry> {
   });
 
   if (!response.ok) {
-    // Try to parse error response for friendly message
-    let errorMessage = `Failed to create entry: ${response.statusText}`;
-    try {
-      const errorData = await response.json();
-      if (errorData.detail) {
-        errorMessage = errorData.detail;
-      }
-    } catch {
-      // If parsing fails, use default message
-    }
-    throw new Error(errorMessage);
+    throw new Error(`Failed to create entry: ${response.statusText}`);
   }
 
   return response.json();

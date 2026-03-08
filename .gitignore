@@ -12,6 +12,9 @@ bin/
 dist/
 build/
 
+# Data folder
+data/
+
 # Go
 *.test
 *.out

@@ -113,6 +113,179 @@ function classifyErrorType(message) {
   return 'unknown';
 }
 
+// ─── Full-Screen Overlay Removal ────────────────────────────────────────────
+
+// Removes age gates, consent modals, and other full-screen overlays using
+// computed styles — catches overlays that CSS selectors alone would miss
+// (e.g., styles applied via external stylesheets or JS frameworks).
+async function removeFullScreenOverlays(page) {
+  return await page.evaluate(() => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // ── Keyword lists (mirrors Go HeuristicConfig) ──
+
+    const ATTR_KEYWORDS = [
+      'age-gate', 'agegate', 'age-verif', 'age_verif', 'age-check',
+      'age-modal', 'age-overlay', 'age-warning', 'age-popup',
+      'adult-modal', 'adult-warning', 'nsfw-gate',
+      'over-18', 'over18', 'modal-adulto',
+      'cookie-consent', 'cookie-banner', 'cookie-notice',
+      'consent-banner', 'consent-modal', 'consent-popup',
+      'gdpr-banner', 'lgpd-banner',
+    ];
+
+    const TEXT_KEYWORDS = [
+      'are you 18', 'verify your age', 'age verification',
+      'you must be 18', '18 years of age', 'adult content',
+      '18 anos', 'maiores de 18', 'conteúdo adulto',
+      'contenido adulto', 'mayor de edad',
+      'we use cookies', 'cookie policy',
+    ];
+
+    const THRESHOLD = 4.0;
+    const MAX_TEXT_LEN = 2000;
+
+    // ── Scoring ──
+
+    function scoreElement(el) {
+      let score = 0;
+      const reasons = [];
+      const add = (w, reason) => { score += w; reasons.push(reason); };
+
+      const s = getComputedStyle(el);
+
+      // --- Layout signals (from computed styles — no CSS cascade blindness) ---
+      const isFixed = s.position === 'fixed' || s.position === 'sticky';
+      if (isFixed) {
+        add(1.5, 'computed:fixed/sticky');
+      }
+
+      const r = el.getBoundingClientRect();
+      if (isFixed && r.width >= vw * 0.4 && r.height >= vh * 0.4) {
+        add(1.5, 'computed:fullscreen');
+      }
+
+      const z = parseInt(s.zIndex, 10);
+      if (z > 999) {
+        add(1.0, `computed:z-index:${z}`);
+      }
+
+      // --- Attribute keywords (id, class, data-*) ---
+      const attrText = [
+        el.id || '',
+        typeof el.className === 'string' ? el.className : '',
+        ...Array.from(el.attributes)
+          .filter(a => a.name.startsWith('data-'))
+          .map(a => a.value),
+      ].join(' ').toLowerCase();
+
+      for (const kw of ATTR_KEYWORDS) {
+        if (attrText.includes(kw)) {
+          add(3.0, `attr:${kw}`);
+          break;
+        }
+      }
+
+      // --- ARIA / role ---
+      if (el.getAttribute('role') === 'dialog' ||
+          el.getAttribute('aria-modal') === 'true') {
+        add(1.5, 'aria:dialog/modal');
+      }
+
+      // --- Backdrop detection (low-opacity fixed overlay behind modal) ---
+      if (isFixed && z > 999) {
+        const opacity = parseFloat(s.opacity);
+        if (opacity < 0.95 && r.width >= vw * 0.9 && r.height >= vh * 0.9) {
+          add(2.0, 'computed:backdrop');
+        }
+      }
+
+      // --- Text keywords (only if already some signal — avoid cost) ---
+      if (score >= 1.0) {
+        const text = (el.innerText || '').toLowerCase();
+        for (const kw of TEXT_KEYWORDS) {
+          if (text.includes(kw)) {
+            add(2.0, `text:${kw}`);
+            break;
+          }
+        }
+        // Penalty: too much text means it's probably real content
+        if (text.length > MAX_TEXT_LEN) {
+          add(-3.0, 'penalty:large-text');
+        }
+      }
+
+      return { score, reasons };
+    }
+
+    // ── Collect candidates ──
+    // Walk top-down; if a parent is removed, skip its children.
+
+    const toRemove = [];
+    const removedSet = new Set();
+
+    for (const el of document.querySelectorAll('body *')) {
+      // Skip if an ancestor is already marked
+      let dominated = false;
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        if (removedSet.has(p)) { dominated = true; break; }
+      }
+      if (dominated) continue;
+
+      // Skip invisible elements (nothing to remove)
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden') continue;
+
+      const { score, reasons } = scoreElement(el);
+      if (score >= THRESHOLD) {
+        toRemove.push({
+          el,
+          tag: el.tagName.toLowerCase(),
+          id: el.id || '',
+          classes: (typeof el.className === 'string'
+            ? el.className : '').substring(0, 200),
+          score,
+          reasons,
+        });
+        removedSet.add(el);
+      }
+    }
+
+    // ── Remove ──
+    const removed = [];
+    for (const entry of toRemove) {
+      entry.el.remove();
+      removed.push({
+        tag: entry.tag,
+        id: entry.id,
+        classes: entry.classes,
+        score: entry.score,
+        reasons: entry.reasons,
+      });
+    }
+
+    // ── Unlock scroll ──
+    let scrollUnlocked = false;
+    for (const root of [document.body, document.documentElement]) {
+      if (root && getComputedStyle(root).overflow === 'hidden') {
+        root.style.overflow = '';
+        scrollUnlocked = true;
+      }
+    }
+
+    return {
+      removed_count: removed.length,
+      removed_elements: removed,
+      scroll_unlocked: scrollUnlocked,
+    };
+  }).catch(() => ({
+    removed_count: 0,
+    removed_elements: [],
+    scroll_unlocked: false,
+  }));
+}
+
 // ─── Challenge Detection ────────────────────────────────────────────────────
 
 // FIX: WEAK_SIGNALS now includes 'recaptcha' to match what detectChallengeSignals
@@ -884,6 +1057,10 @@ async function _scrapeAttempt(config, attemptNumber) {
         .catch(() => {});
     }
  
+    // ── NEW: remove surviving overlays before scroll/capture ──
+    timeoutStage = 'overlay_removal';
+    const overlayResult = await removeFullScreenOverlays(page);
+ 
     // Lazy scroll
     timeoutStage = 'lazy_scroll';
     const lazyScroll = config.autoScroll !== false ? await autoScrollForLazyLoadedImages(page, {
@@ -1017,6 +1194,7 @@ async function _scrapeAttempt(config, attemptNumber) {
       capture_mode: captureMode,
       // Removed: privacypopupclicks, consentredirecthandled, consentredirectresult
       lazy_scroll: lazyScroll,
+      overlay_removal: overlayResult,
       timeout_stage: '',
       error_type: '',
       attempt: attemptNumber,

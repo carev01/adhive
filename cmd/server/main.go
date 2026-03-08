@@ -169,6 +169,7 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		entries.Use(authMiddleware.Authenticate())
 		{
 			entries.GET("", entryHandler.List)
+			entries.GET("/sources", entryHandler.Sources)
 			entries.POST("", entryHandler.Create)
 			entries.POST("/random", entryHandler.Random)
 			entries.GET("/:id", entryHandler.Get)

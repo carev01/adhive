@@ -51,6 +51,42 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 		query = query.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
 	}
 
+	// HasInteraction filter - only entries with interactions
+	if filter.HasInteraction {
+		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
+	}
+
+	// MinScore filter - entries where user's score >= minScore (implies HasInteraction)
+	if filter.MinScore > 0 {
+		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
+	}
+
+	// Date range filter
+	if filter.DateFrom != "" {
+		query = query.Where("created_at >= ?", filter.DateFrom)
+	}
+	if filter.DateTo != "" {
+		query = query.Where("created_at <= ?", filter.DateTo+" 23:59:59")
+	}
+
+	// Source/domain filter
+	if filter.Source != "" {
+		query = query.Where("url LIKE ?", "%"+filter.Source+"%")
+	}
+
+	// Determine sort order
+	sortField := "created_at"
+	sortDir := "DESC"
+	switch filter.SortBy {
+	case "title":
+		sortField = "title"
+	case "updated_at":
+		sortField = "updated_at"
+	}
+	if filter.SortOrder == "asc" {
+		sortDir = "ASC"
+	}
+
 	// Count total
 	var total int64
 	query.Model(&model.CatalogEntry{}).Count(&total)
@@ -58,7 +94,7 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 	// Apply pagination
 	offset := (filter.Page - 1) * filter.Limit
 	var entries []*model.CatalogEntry
-	err := query.Order("created_at DESC").
+	err := query.Order(sortField + " " + sortDir).
 		Offset(offset).
 		Limit(filter.Limit).
 		Find(&entries).Error
@@ -88,6 +124,42 @@ func (r *EntryRepository) Search(ctx context.Context, userID, query string, filt
 		baseQuery = baseQuery.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
 	}
 
+	// Date range filter
+	if filter.DateFrom != "" {
+		baseQuery = baseQuery.Where("created_at >= ?", filter.DateFrom)
+	}
+	if filter.DateTo != "" {
+		baseQuery = baseQuery.Where("created_at <= ?", filter.DateTo+" 23:59:59")
+	}
+
+	// Source/domain filter
+	if filter.Source != "" {
+		baseQuery = baseQuery.Where("url LIKE ?", "%"+filter.Source+"%")
+	}
+
+	// HasInteraction filter - only entries with interactions
+	if filter.HasInteraction {
+		baseQuery = baseQuery.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
+	}
+
+	// MinScore filter - entries where user's score >= minScore (implies HasInteraction)
+	if filter.MinScore > 0 {
+		baseQuery = baseQuery.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
+	}
+
+	// Determine sort order
+	sortField := "created_at"
+	sortDir := "DESC"
+	switch filter.SortBy {
+	case "title":
+		sortField = "title"
+	case "updated_at":
+		sortField = "updated_at"
+	}
+	if filter.SortOrder == "asc" {
+		sortDir = "ASC"
+	}
+
 	// Count total matching entries
 	var total int64
 	baseQuery.Model(&model.CatalogEntry{}).Count(&total)
@@ -95,7 +167,7 @@ func (r *EntryRepository) Search(ctx context.Context, userID, query string, filt
 	// Apply pagination
 	offset := (filter.Page - 1) * filter.Limit
 	var entries []*model.CatalogEntry
-	err := baseQuery.Order("created_at DESC").
+	err := baseQuery.Order(sortField + " " + sortDir).
 		Offset(offset).
 		Limit(filter.Limit).
 		Find(&entries).Error
@@ -258,4 +330,29 @@ func (r *EntryRepository) FindPendingForArchiving(ctx context.Context, limit int
 		Limit(limit).
 		Find(&entries).Error
 	return entries, err
+}
+
+// GetUserSources returns unique domains/sources from user's entries
+func (r *EntryRepository) GetUserSources(ctx context.Context, userID string) ([]string, error) {
+	var results []string
+	
+	// Extract domain from URL using a simple approach
+	rows, err := r.db.WithContext(ctx).
+		Model(&model.CatalogEntry{}).
+		Select("DISTINCT SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) as source").
+		Where("user_id = ?", userID).
+		Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var source string
+		if err := rows.Scan(&source); err == nil && source != "" {
+			results = append(results, source)
+		}
+	}
+
+	return results, nil
 }
