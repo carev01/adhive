@@ -426,12 +426,6 @@ func importSQLData() error {
 			inValues = false
 			valuesBuffer.Reset()
 			
-			// Use inline min
-			previewLen := len(line)
-			if previewLen > 50 {
-				previewLen = 50
-			}
-// 			logVerbose("Found INSERT INTO: %s", line[:previewLen])
 			// Extract table name
 			re := regexp.MustCompile("INSERT\\s+INTO\\s+[`]*(\\w+)[`]*")
 			matches := re.FindStringSubmatch(line)
@@ -680,7 +674,7 @@ func parseBookmarks(values string) ([]ShioriBookmark, error) {
 		if inQuote && ch == quoteChar {
 			// Check for escaped quote (doubled quote like '' or "")
 			if i+1 < len(values) && values[i+1] == quoteChar {
-				i++ // Skip both quotes
+				// Skip both quotes - increment i by changing loop logic below instead
 			} else {
 				inQuote = false
 			}

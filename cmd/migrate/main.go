@@ -229,12 +229,12 @@ func createMigration(name, dir string) error {
 	}
 
 	filename := fmt.Sprintf("%0d_%s.sql", maxNum+1, name)
-	content := fmt.Sprintf(`-- +migrate Up
+	content := `-- +migrate Up
 -- Add your migration here
 
 -- +migrate Down
 -- Rollback here
-`)
+`
 
 	if err := os.WriteFile(filepath.Join(dir, filename), []byte(content), 0644); err != nil {
 		return fmt.Errorf("write file: %w", err)
