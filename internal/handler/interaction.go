@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -40,12 +41,7 @@ type InteractionResponse struct {
 func (h *InteractionHandler) Get(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -54,12 +50,7 @@ func (h *InteractionHandler) Get(c *gin.Context) {
 	// Verify entry exists and belongs to user
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
 	if err != nil || entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "entry not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 
@@ -78,12 +69,7 @@ func (h *InteractionHandler) Get(c *gin.Context) {
 func (h *InteractionHandler) Upsert(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -92,47 +78,27 @@ func (h *InteractionHandler) Upsert(c *gin.Context) {
 	// Verify entry exists and belongs to user
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
 	if err != nil || entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "entry not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 
 	// Parse input
 	var input model.InteractionInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
 	// Validate
 	if !input.Validate() {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: "score must be between 0 and 5",
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, "score must be between 0 and 5"))
 		return
 	}
 
 	// Upsert interaction
 	interaction, err := h.interactionRepo.Upsert(c.Request.Context(), entryID, userID, &input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to save interaction", err))
 		return
 	}
 
@@ -143,12 +109,7 @@ func (h *InteractionHandler) Upsert(c *gin.Context) {
 func (h *InteractionHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -156,12 +117,7 @@ func (h *InteractionHandler) Delete(c *gin.Context) {
 
 	err := h.interactionRepo.Delete(c.Request.Context(), entryID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete interaction", err))
 		return
 	}
 

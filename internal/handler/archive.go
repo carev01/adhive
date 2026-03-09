@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/config"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -40,17 +41,17 @@ func (h *ArchiveOpsHandler) ListRevisions(c *gin.Context) {
 	entryID := c.Param("id")
 	userID := c.GetString("user_id")
 	if entryID == "" || userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, "invalid request"))
 		return
 	}
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
 	if err != nil || entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "entry not found"})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 	revs, err := h.revisionRepo.ListByEntryID(c.Request.Context(), entryID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch revisions", err))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"revisions": revs})
@@ -61,12 +62,12 @@ func (h *ArchiveOpsHandler) Refresh(c *gin.Context) {
 	entryID := c.Param("id")
 	userID := c.GetString("user_id")
 	if entryID == "" || userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, "invalid request"))
 		return
 	}
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
 	if err != nil || entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "entry not found"})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 	entry.ArchiveStatus = "pending"
@@ -102,7 +103,7 @@ func (h *ArchiveOpsHandler) Metrics(c *gin.Context) {
 	since := time.Now().Add(-time.Duration(hours) * time.Hour)
 	m, err := h.revisionRepo.Metrics(c.Request.Context(), since)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch metrics", err))
 		return
 	}
 
@@ -137,26 +138,26 @@ func (h *ArchiveOpsHandler) DeleteRevision(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	if entryID == "" || revisionID == "" || userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, "invalid request"))
 		return
 	}
 
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), entryID)
 	if err != nil || entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "entry not found"})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 
 	revision, err := h.revisionRepo.GetByID(c.Request.Context(), revisionID)
 	if err != nil || revision == nil || revision.EntryID != entryID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "revision not found"})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeNotFound, "revision"))
 		return
 	}
 
 	// Delete assets from DB
 	if h.assetRepo != nil {
 		if err := h.assetRepo.DeleteByRevisionID(c.Request.Context(), revisionID); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete assets"})
+			SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete assets", err))
 			return
 		}
 	}
@@ -170,14 +171,14 @@ func (h *ArchiveOpsHandler) DeleteRevision(c *gin.Context) {
 			absPath = filepath.Clean(absPath)
 		}
 		if err := os.RemoveAll(absPath); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete revision files"})
+			SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete revision files", err))
 			return
 		}
 	}
 
 	// Delete revision record from DB
 	if err := h.revisionRepo.DeleteByID(c.Request.Context(), revisionID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete revision"})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete revision", err))
 		return
 	}
 

@@ -25,7 +25,11 @@ func NewEntryRepository(db *gorm.DB) *EntryRepository {
 
 // Create creates a new entry
 func (r *EntryRepository) Create(ctx context.Context, entry *model.CatalogEntry) error {
-	return r.db.WithContext(ctx).Create(entry).Error
+	err := r.db.WithContext(ctx).Create(entry).Error
+	if err != nil {
+		return WrapDBError(err, "Entry", entry.ID)
+	}
+	return nil
 }
 
 // GetByID finds an entry by ID
@@ -33,7 +37,7 @@ func (r *EntryRepository) GetByID(ctx context.Context, id string) (*model.Catalo
 	var entry model.CatalogEntry
 	err := r.db.WithContext(ctx).Where("id = ?", id).First(&entry).Error
 	if err != nil {
-		return nil, err
+		return nil, WrapDBError(err, "Entry", id)
 	}
 	return &entry, nil
 }
@@ -315,45 +319,50 @@ func (r *EntryRepository) searchWithLike(ctx context.Context, userID, query stri
 
 // Update updates an existing entry
 func (r *EntryRepository) Update(ctx context.Context, entry *model.CatalogEntry) error {
-	return r.db.WithContext(ctx).Save(entry).Error
+	err := r.db.WithContext(ctx).Save(entry).Error
+	if err != nil {
+		return WrapDBError(err, "Entry", entry.ID)
+	}
+	return nil
 }
 
 // Delete deletes an entry by ID (only if owned by user)
 func (r *EntryRepository) Delete(ctx context.Context, id, userID string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// First verify ownership
 		var entry model.CatalogEntry
 		if err := tx.Where("id = ? AND user_id = ?", id, userID).First(&entry).Error; err != nil {
-			return err
+			return WrapDBError(err, "Entry", id)
 		}
 
 		// Get revision IDs for this entry
 		var revisionIDs []string
 		if err := tx.Model(&model.ArchiveRevision{}).Where("entry_id = ?", id).Pluck("id", &revisionIDs).Error; err != nil {
-			return err
+			return WrapDBError(err, "Entry", id)
 		}
 
 		// Delete archive assets by revision IDs
 		if len(revisionIDs) > 0 {
 			if err := tx.Where("revision_id IN ?", revisionIDs).Delete(&model.ArchiveAsset{}).Error; err != nil {
-				return err
+				return WrapDBError(err, "Entry", id)
 			}
 		}
 		// Delete archive revisions
 		if err := tx.Where("entry_id = ?", id).Delete(&model.ArchiveRevision{}).Error; err != nil {
-			return err
+			return WrapDBError(err, "Entry", id)
 		}
 		// Delete entry tags
 		if err := tx.Where("entry_id = ?", id).Delete(&model.EntryTag{}).Error; err != nil {
-			return err
+			return WrapDBError(err, "Entry", id)
 		}
 		// Delete interactions
 		if err := tx.Where("entry_id = ?", id).Delete(&model.Interaction{}).Error; err != nil {
-			return err
+			return WrapDBError(err, "Entry", id)
 		}
 		// Delete entry
 		return tx.Where("id = ?", id).Delete(&model.CatalogEntry{}).Error
 	})
+	return WrapDBError(err, "Entry", id)
 }
 
 // GetByUserIDWithTags finds all entries for a user with their tags (fixes N+1 query)
@@ -531,11 +540,11 @@ func (r *EntryRepository) FindRandomEntry(ctx context.Context, userID string) (*
 	var count int64
 	if err := r.db.WithContext(ctx).Model(&model.CatalogEntry{}).
 		Where("user_id = ?", userID).Count(&count).Error; err != nil {
-		return nil, err
+		return nil, WrapDBError(err, "Entry", "")
 	}
 
 	if count == 0 {
-		return nil, gorm.ErrRecordNotFound
+		return nil, WrapDBError(gorm.ErrRecordNotFound, "Entry", "")
 	}
 
 	// Random offset
@@ -647,7 +656,7 @@ func (r *EntryRepository) FindByURL(ctx context.Context, userID, url string) (*m
 	var entry model.CatalogEntry
 	err := r.db.WithContext(ctx).Where("user_id = ? AND url = ?", userID, url).First(&entry).Error
 	if err != nil {
-		return nil, err
+		return nil, WrapDBError(err, "Entry", "")
 	}
 	return &entry, nil
 }

@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { login } from '$lib/api/auth';
 
 	let email = '';
 	let password = '';
 	let error = '';
 	let loading = false;
+
+	// Get returnUrl from query params
+	$: returnUrl = $page.url.searchParams.get('returnUrl') || '/entries';
 
 	async function handleSubmit() {
 		error = '';
@@ -28,7 +32,7 @@
 		if (result.error) {
 			error = result.error;
 		} else {
-			goto('/entries');
+			goto(returnUrl);
 		}
 		loading = false;
 	}

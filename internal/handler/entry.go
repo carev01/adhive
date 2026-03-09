@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/carev01/adhive/internal/config"
+	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/google/uuid"
@@ -133,12 +134,7 @@ func entryToResponse(entry *model.CatalogEntry, tags []TagInfo) *EntryResponse {
 func (h *EntryHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -196,12 +192,7 @@ func (h *EntryHandler) List(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entries", err))
 		return
 	}
 
@@ -228,23 +219,13 @@ func (h *EntryHandler) List(c *gin.Context) {
 func (h *EntryHandler) Sources(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	sources, err := h.entryRepo.GetUserSources(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch sources", err))
 		return
 	}
 
@@ -255,23 +236,13 @@ func (h *EntryHandler) Sources(c *gin.Context) {
 func (h *EntryHandler) Locations(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	locations, err := h.entryRepo.GetUserLocations(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch locations", err))
 		return
 	}
 
@@ -289,23 +260,13 @@ type BulkTagRequest struct {
 func (h *EntryHandler) BulkTag(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	var req BulkTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
@@ -317,12 +278,7 @@ func (h *EntryHandler) BulkTag(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "bulk tag operation failed", err))
 		return
 	}
 
@@ -338,34 +294,19 @@ type BulkDeleteRequest struct {
 func (h *EntryHandler) BulkDelete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	var req BulkDeleteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
 	err := h.entryRepo.BulkDelete(c.Request.Context(), userID, req.EntryIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "bulk delete failed", err))
 		return
 	}
 
@@ -376,23 +317,13 @@ func (h *EntryHandler) BulkDelete(c *gin.Context) {
 func (h *EntryHandler) BulkArchive(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	var req BulkDeleteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
@@ -408,23 +339,13 @@ func (h *EntryHandler) BulkArchive(c *gin.Context) {
 func (h *EntryHandler) Create(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	var req CreateEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
@@ -441,12 +362,7 @@ func (h *EntryHandler) Create(c *gin.Context) {
 
 	err := h.entryRepo.Create(c.Request.Context(), entry)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create entry", err))
 		return
 	}
 
@@ -462,12 +378,7 @@ func (h *EntryHandler) Create(c *gin.Context) {
 func (h *EntryHandler) Get(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -475,29 +386,14 @@ func (h *EntryHandler) Get(c *gin.Context) {
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "entry not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entry", err))
 		return
 	}
 	if entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "entry not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 
@@ -517,12 +413,7 @@ func (h *EntryHandler) Get(c *gin.Context) {
 func (h *EntryHandler) Update(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -532,40 +423,20 @@ func (h *EntryHandler) Update(c *gin.Context) {
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "entry not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entry", err))
 		return
 	}
 	if entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "entry not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 
 	var req UpdateEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
@@ -595,12 +466,7 @@ func (h *EntryHandler) Update(c *gin.Context) {
 
 	err = h.entryRepo.Update(c.Request.Context(), entry)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to update entry", err))
 		return
 	}
 
@@ -618,12 +484,7 @@ func (h *EntryHandler) Update(c *gin.Context) {
 func (h *EntryHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -633,29 +494,14 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "entry not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entry", err))
 		return
 	}
 	if entry == nil || entry.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "entry not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
 		return
 	}
 
@@ -665,12 +511,7 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 		archiveDir := filepath.Join(h.storageConfig.ArchivesDir, entry.ID)
 		if err := os.RemoveAll(archiveDir); err != nil {
 			// Log but don't fail the delete - DB delete is more important
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Internal Server Error",
-				Status: http.StatusInternalServerError,
-				Detail: "failed to delete archive files",
-			})
+			SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete archive files", err))
 			return
 		}
 
@@ -683,12 +524,7 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 
 	err = h.entryRepo.Delete(c.Request.Context(), id, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete entry", err))
 		return
 	}
 
@@ -706,12 +542,7 @@ type RandomRequest struct {
 func (h *EntryHandler) Random(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -750,12 +581,7 @@ func (h *EntryHandler) Random(c *gin.Context) {
 	}
 
 	if err != nil || entry == nil {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "no entries found matching criteria",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeNotFound, "no entries found matching criteria"))
 		return
 	}
 

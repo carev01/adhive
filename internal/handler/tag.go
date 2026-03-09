@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 
+	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 
@@ -69,23 +70,13 @@ var hexColorRegex = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 func (h *TagHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	tags, err := h.tagRepo.FindByUserID(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tags", err))
 		return
 	}
 
@@ -101,23 +92,13 @@ func (h *TagHandler) List(c *gin.Context) {
 func (h *TagHandler) ListWithCount(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	tags, err := h.tagRepo.GetTagsWithCount(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tags with count", err))
 		return
 	}
 
@@ -136,34 +117,19 @@ func (h *TagHandler) ListWithCount(c *gin.Context) {
 func (h *TagHandler) Create(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
 	var req CreateTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
 	// Validate color format if provided
 	if req.Color != "" && !hexColorRegex.MatchString(req.Color) {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: "invalid color format: must be hex color (e.g. #FF5733)",
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidFormat, "invalid color format: must be hex color (e.g. #FF5733)"))
 		return
 	}
 
@@ -181,12 +147,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 
 	err := h.tagRepo.Create(tag)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create tag", err))
 		return
 	}
 
@@ -197,12 +158,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 func (h *TagHandler) Get(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -210,29 +166,14 @@ func (h *TagHandler) Get(c *gin.Context) {
 	tag, err := h.tagRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "tag not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
 		return
 	}
 	if tag == nil || tag.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "tag not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 		return
 	}
 
@@ -243,12 +184,7 @@ func (h *TagHandler) Get(c *gin.Context) {
 func (h *TagHandler) Update(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -258,40 +194,20 @@ func (h *TagHandler) Update(c *gin.Context) {
 	tag, err := h.tagRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "tag not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
 		return
 	}
 	if tag == nil || tag.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "tag not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 		return
 	}
 
 	var req UpdateTagRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
@@ -301,12 +217,7 @@ func (h *TagHandler) Update(c *gin.Context) {
 	}
 	if req.Color != nil {
 		if !hexColorRegex.MatchString(*req.Color) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Bad Request",
-				Status: http.StatusBadRequest,
-				Detail: "invalid color format: must be hex color (e.g. #FF5733)",
-			})
+			SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidFormat, "invalid color format: must be hex color (e.g. #FF5733)"))
 			return
 		}
 		tag.Color = *req.Color
@@ -314,12 +225,7 @@ func (h *TagHandler) Update(c *gin.Context) {
 
 	err = h.tagRepo.Update(tag)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to update tag", err))
 		return
 	}
 
@@ -330,12 +236,7 @@ func (h *TagHandler) Update(c *gin.Context) {
 func (h *TagHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -345,40 +246,20 @@ func (h *TagHandler) Delete(c *gin.Context) {
 	tag, err := h.tagRepo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "tag not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
 		return
 	}
 	if tag == nil || tag.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "tag not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 		return
 	}
 
 	err = h.tagRepo.Delete(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete tag", err))
 		return
 	}
 
@@ -389,12 +270,7 @@ func (h *TagHandler) Delete(c *gin.Context) {
 func (h *TagHandler) AddEntryTag(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -405,12 +281,7 @@ func (h *TagHandler) AddEntryTag(c *gin.Context) {
 		TagID string `json:"tag_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
@@ -418,40 +289,20 @@ func (h *TagHandler) AddEntryTag(c *gin.Context) {
 	tag, err := h.tagRepo.FindByID(req.TagID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "tag not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
 		return
 	}
 	if tag == nil || tag.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "tag not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 		return
 	}
 
 	err = h.tagRepo.AddEntryTag(entryID, req.TagID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to add tag to entry", err))
 		return
 	}
 
@@ -462,12 +313,7 @@ func (h *TagHandler) AddEntryTag(c *gin.Context) {
 func (h *TagHandler) RemoveEntryTag(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "user not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "user not authenticated"))
 		return
 	}
 
@@ -478,40 +324,20 @@ func (h *TagHandler) RemoveEntryTag(c *gin.Context) {
 	tag, err := h.tagRepo.FindByID(tagID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Type:   "about:blank",
-				Title:  "Not Found",
-				Status: http.StatusNotFound,
-				Detail: "tag not found",
-			})
+			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
 		return
 	}
 	if tag == nil || tag.UserID != userID {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Not Found",
-			Status: http.StatusNotFound,
-			Detail: "tag not found",
-		})
+		SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
 		return
 	}
 
 	err = h.tagRepo.RemoveEntryTag(entryID, tagID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to remove tag from entry", err))
 		return
 	}
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/carev01/adhive/internal/auth"
+	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -28,13 +29,6 @@ type UserResponse struct {
 	Email       string    `json:"email"`
 	DisplayName string    `json:"display_name"`
 	CreatedAt   time.Time `json:"created_at"`
-}
-
-type ErrorResponse struct {
-	Type    string `json:"type"`
-	Title   string `json:"title"`
-	Status  int    `json:"status"`
-	Detail  string `json:"detail"`
 }
 
 type AuthResponse struct {
@@ -61,58 +55,33 @@ func NewAuthHandler(userRepo *repository.UserRepository, sessionRepo *repository
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
 	// Validate email format
 	if err := auth.ValidateEmail(req.Email); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: "invalid email format",
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidEmail, "invalid email format"))
 		return
 	}
 
 	// Validate password strength
 	if err := auth.ValidatePassword(req.Password); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidPassword, err.Error()))
 		return
 	}
 
 	// Check if user already exists
 	existing, _ := h.userRepo.FindByEmail(req.Email)
 	if existing != nil {
-		c.JSON(http.StatusConflict, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Conflict",
-			Status: http.StatusConflict,
-			Detail: "email already registered",
-		})
+		SendError(c, apperrors.NewConflictError(apperrors.CodeDuplicateUser, "email already registered"))
 		return
 	}
 
 	// Hash password
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: "failed to process password",
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to process password", err))
 		return
 	}
 
@@ -126,12 +95,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	if err := h.userRepo.Create(user); err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: "failed to create user",
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create user", err))
 		return
 	}
 
@@ -143,12 +107,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	if err := h.sessionRepo.Create(session); err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: "failed to create session",
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create session", err))
 		return
 	}
 
@@ -169,46 +128,26 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Bad Request",
-			Status: http.StatusBadRequest,
-			Detail: err.Error(),
-		})
+		SendError(c, apperrors.NewValidationError(apperrors.CodeInvalidInput, err.Error()))
 		return
 	}
 
 	// Find user
 	user, err := h.userRepo.FindByEmail(req.Email)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "invalid email or password",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "invalid email or password"))
 		return
 	}
 
 	// Verify password
 	if err := auth.VerifyPassword(req.Password, user.PasswordHash); err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "invalid email or password",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "invalid email or password"))
 		return
 	}
 
 	// Check if user is active
 	if !user.IsActive {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "account is disabled",
-		})
+		SendError(c, apperrors.NewForbiddenError(apperrors.CodeForbidden, "account is disabled"))
 		return
 	}
 
@@ -220,12 +159,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if err := h.sessionRepo.Create(session); err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Internal Server Error",
-			Status: http.StatusInternalServerError,
-			Detail: "failed to create session",
-		})
+		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create session", err))
 		return
 	}
 
@@ -260,12 +194,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	// User should be set by auth middleware
 	userVal, exists := c.Get("user")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Type:   "about:blank",
-			Title:  "Unauthorized",
-			Status: http.StatusUnauthorized,
-			Detail: "not authenticated",
-		})
+		SendError(c, apperrors.NewUnauthorizedError(apperrors.CodeUnauthorized, "not authenticated"))
 		return
 	}
 

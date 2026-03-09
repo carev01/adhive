@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,8 +16,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/carev01/adhive/internal/degradation"
+	appErrors "github.com/carev01/adhive/internal/errors"
+	"github.com/carev01/adhive/internal/logging"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
+	"github.com/carev01/adhive/internal/retry"
 	"github.com/carev01/adhive/internal/service"
 
 	"github.com/google/uuid"
@@ -25,58 +30,71 @@ import (
 
 // ArchiveWorker handles background archiving of URLs
 type ArchiveWorker struct {
-	entryRepo              *repository.EntryRepository
-	archiveRevisionRepo    *repository.ArchiveRevisionRepository
-	archiveAssetRepo       *repository.ArchiveAssetRepository
-	thumbnailCandidateRepo *repository.ThumbnailCandidateRepository
-	httpClient             *http.Client
-	dataDir                string
-	jobChan                chan string
-	stopChan               chan struct{}
-	metadataExtractor      *service.MetadataExtractor
-	thumbnailService       *service.ThumbnailService
-	playwrightService      *service.PlaywrightService
-	archiveBundler         *service.ArchiveBundler
-	retentionLimit         int
-	usePlaywright          bool
-	manualCaptureRequests  sync.Map // entryID -> bool
-	processing            map[string]struct{}
-	stopped                atomic.Bool
-	stopOnce               sync.Once
+	entryRepo               *repository.EntryRepository
+	archiveRevisionRepo     *repository.ArchiveRevisionRepository
+	archiveAssetRepo        *repository.ArchiveAssetRepository
+	thumbnailCandidateRepo  *repository.ThumbnailCandidateRepository
+	httpClient              *http.Client
+	dataDir                 string
+	jobChan                 chan string
+	stopChan                chan struct{}
+	metadataExtractor       *service.MetadataExtractor
+	thumbnailService        *service.ThumbnailService
+	playwrightService       *service.PlaywrightService
+	archiveBundler          *service.ArchiveBundler
+	retentionLimit          int
+	usePlaywright           bool
+	manualCaptureRequests   sync.Map // entryID -> bool
+	processing              map[string]struct{}
+	stopped                 atomic.Bool
+	stopOnce                sync.Once
+	logger                  *logging.Logger
+	degradationManager      *degradation.Manager
+	playwrightCircuitBreaker *degradation.CircuitBreaker
 }
 
 // NewArchiveWorker creates a new ArchiveWorker
 func NewArchiveWorker(entryRepo *repository.EntryRepository, dataDir string) *ArchiveWorker {
-    playwrightConfig := service.DefaultPlaywrightConfig()
-    playwrightService := service.NewPlaywrightService(playwrightConfig)
+	playwrightConfig := service.DefaultPlaywrightConfig()
+	playwrightService := service.NewPlaywrightService(playwrightConfig)
 
-    archiveBundler, err := service.NewArchiveBundler(dataDir)
-    if err != nil {
-        log.Fatalf("failed to create archive bundler: %v", err)
-    }
+	archiveBundler, err := service.NewArchiveBundler(dataDir)
+	if err != nil {
+		logging.Default().Error(err, "failed to create archive bundler")
+		os.Exit(1)
+	}
 
-    return &ArchiveWorker{
-        entryRepo:         entryRepo,
-        metadataExtractor: service.NewMetadataExtractor(),
-        thumbnailService:  service.NewThumbnailService(dataDir),
-        playwrightService: playwrightService,
-        archiveBundler:    archiveBundler,  // Use the variable, not the function call
-        retentionLimit:    3,
-        usePlaywright:     playwrightService.IsAvailable(),
-        processing:       make(map[string]struct{}),
-        httpClient: &http.Client{
-            Timeout: 30 * time.Second,
-            CheckRedirect: func(req *http.Request, via []*http.Request) error {
-                if len(via) >= 10 {
-                    return fmt.Errorf("too many redirects")
-                }
-                return nil
-            },
-        },
-        dataDir:  dataDir,
-        jobChan:  make(chan string, 100),
-        stopChan: make(chan struct{}),
-    }
+	// Initialize degradation manager
+	degradationManager := degradation.NewManager()
+	// Default to full mode for all features
+	degradationManager.SetMode(degradation.FeaturePlaywright, degradation.ModeFull)
+	degradationManager.SetMode(degradation.FeatureArchive, degradation.ModeFull)
+
+	return &ArchiveWorker{
+		entryRepo:                entryRepo,
+		metadataExtractor:        service.NewMetadataExtractor(),
+		thumbnailService:         service.NewThumbnailService(dataDir),
+		playwrightService:        playwrightService,
+		archiveBundler:           archiveBundler,
+		retentionLimit:           3,
+		usePlaywright:            playwrightService.IsAvailable(),
+		processing:              make(map[string]struct{}),
+		logger:                   logging.Default(),
+		degradationManager:       degradationManager,
+		playwrightCircuitBreaker: degradation.NewCircuitBreaker(5, 30*time.Second),
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 10 {
+					return fmt.Errorf("too many redirects")
+				}
+				return nil
+			},
+		},
+		dataDir:  dataDir,
+		jobChan:  make(chan string, 100),
+		stopChan: make(chan struct{}),
+	}
 }
 
 // SetArchivePersistence enables DB persistence for archive revisions/assets.
@@ -96,7 +114,7 @@ func (w *ArchiveWorker) SetThumbnailCandidateRepository(repo *repository.Thumbna
 // Start begins the worker goroutine
 func (w *ArchiveWorker) Start(ctx context.Context) {
 	go w.run(ctx)
-	log.Println("Archive worker started")
+	w.logger.Info("Archive worker started")
 }
 
 // Stop signals the worker to stop
@@ -104,7 +122,7 @@ func (w *ArchiveWorker) Stop() {
 	w.stopOnce.Do(func() {
 		w.stopped.Store(true)
 		close(w.stopChan)
-		log.Println("Archive worker stopped")
+		w.logger.Info("Archive worker stopped")
 	})
 }
 
@@ -122,7 +140,7 @@ func (w *ArchiveWorker) QueueJobWithOptions(entryID string, manualMode bool) {
 		w.manualCaptureRequests.Store(entryID, true)
 	}
 	if w.stopped.Load() {
-		log.Printf("Worker stopped, dropping job for entry %s", entryID)
+		w.logger.Warn("Worker stopped, dropping job", "entry_id", entryID)
 		if manualMode {
 			w.manualCaptureRequests.Delete(entryID)
 		}
@@ -130,13 +148,14 @@ func (w *ArchiveWorker) QueueJobWithOptions(entryID string, manualMode bool) {
 	}
 	select {
 	case <-w.stopChan:
-		log.Printf("Worker stopped, dropping job for entry %s", entryID)
+		w.logger.Warn("Worker stopped, dropping job", "entry_id", entryID)
 		if manualMode {
 			w.manualCaptureRequests.Delete(entryID)
 		}
 	case w.jobChan <- entryID:
+		// Job queued successfully
 	default:
-		log.Printf("Job queue full, dropping job for entry %s", entryID)
+		w.logger.Warn("Job queue full, dropping job", "entry_id", entryID)
 		if manualMode {
 			w.manualCaptureRequests.Delete(entryID)
 		}
@@ -202,15 +221,20 @@ func (w *ArchiveWorker) processRemaining() {
 
 // processJob processes a single archive job
 func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
-	log.Printf("Processing archive job for entry %s", entryID)
+	logger := w.logger.WithContext(ctx).With(
+		slog.String("entry_id", entryID),
+		slog.String("operation", "processJob"),
+	)
+	logger.Info("Processing archive job")
 
 	entry, err := w.entryRepo.GetByID(ctx, entryID)
 	if err != nil {
-		log.Printf("Error finding entry %s: %v", entryID, err)
+		logger.Error(err, "Error finding entry")
+		w.handleError(ctx, entry, appErrors.NewInternalError(appErrors.CodeEntryNotFound, "Entry not found", err).WithContext("entry_id", entryID))
 		return
 	}
 	if entry == nil {
-		log.Printf("Entry %s not found", entryID)
+		logger.Warn("Entry not found")
 		return
 	}
 
@@ -222,19 +246,61 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 
 	entry.ArchiveStatus = model.ArchiveStatusPending
 	if err := w.entryRepo.Update(ctx, entry); err != nil {
-		log.Printf("Error updating entry status: %v", err)
+		logger.Error(err, "Error updating entry status")
 		return
 	}
-
 
 	// Mark entry as processing to avoid duplicate queuing
 	w.processing[entry.ID] = struct{}{}
 	defer delete(w.processing, entry.ID)
 
 	var capture *service.PlaywrightResult
-	if w.usePlaywright {
-		// manualMode already consumed above
-		if manualMode {
+	var captureDuration time.Duration
+	var usedFallback bool
+
+	// Use retry logic for capture operations
+	retryConfig := retry.ArchiveConfig()
+	captureErr := retry.Do(ctx, retryConfig, func(err error) bool {
+		// isRetryable predicate
+		if appErr, ok := appErrors.IsAppError(err); ok {
+			return appErr.Retryable
+		}
+		// Default: retry on unknown errors for archive operations
+		return true
+	}, func() error {
+		startTime := time.Now()
+
+		if w.usePlaywright && !manualMode {
+			// Use circuit breaker for Playwright
+			err := w.playwrightCircuitBreaker.Call(func() error {
+				result, err := w.playwrightService.ScrapeWithRetry(ctx, entry.URL, 2)
+				if err != nil {
+					return err
+				}
+				capture = result
+				return nil
+			})
+
+			if err != nil {
+				// Playwright failed, determine if we should retry or fallback
+				if w.degradationManager.GetMode(degradation.FeaturePlaywright) == degradation.ModeDegraded {
+					logger.Warn("Playwright failed, attempting HTTP fallback", "error", err)
+					usedFallback = true
+					html, statusCode, fetchErr := w.fetchURL(ctx, entry.URL)
+					if fetchErr != nil {
+						return appErrors.NewExternalError(appErrors.CodePlaywrightFailed, "Playwright failed, HTTP fallback also failed", fetchErr)
+					}
+					capture = &service.PlaywrightResult{
+						HTML:       html,
+						StatusCode: statusCode,
+						FinalURL:   entry.URL,
+					}
+					return nil // Fallback succeeded, don't retry
+				}
+				return err
+			}
+		} else if manualMode {
+			// Manual mode - single attempt with extended timeout
 			result, err := w.playwrightService.Scrape(ctx, entry.URL, map[string]interface{}{
 				"waitFor":         "networkidle",
 				"screenshot":      true,
@@ -243,53 +309,56 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 				"manualTimeoutMs": 180000,
 			})
 			if err != nil {
-				log.Printf("Playwright manual mode failed for %s: %v", entry.URL, err)
-				capture = result
-				if capture == nil {
-					capture = &service.PlaywrightResult{Error: err.Error(), FinalURL: entry.URL}
-				}
+				logger.Error(err, "Playwright manual mode failed")
+				capture = &service.PlaywrightResult{Error: err.Error(), FinalURL: entry.URL}
 			} else {
 				capture = result
 			}
 		} else {
-			result, err := w.playwrightService.ScrapeWithRetry(ctx, entry.URL, 2)
-			if err != nil {
-				log.Printf("Playwright failed for %s: %v, falling back to HTTP", entry.URL, err)
-				html, statusCode, fetchErr := w.fetchURL(ctx, entry.URL)
-				if fetchErr != nil {
-					w.markFailed(ctx, entry, fmt.Sprintf("fetch error: %v", fetchErr))
-					return
-				}
-				capture = &service.PlaywrightResult{
-					HTML:       html,
-					StatusCode: statusCode,
-					FinalURL:   entry.URL,
-				}
-			} else {
-				capture = result
+			// HTTP fallback mode
+			html, statusCode, fetchErr := w.fetchURL(ctx, entry.URL)
+			if fetchErr != nil {
+				return appErrors.NewTransientError(appErrors.CodeTemporaryFailure, "HTTP fetch failed", fetchErr)
+			}
+			capture = &service.PlaywrightResult{
+				HTML:       html,
+				StatusCode: statusCode,
+				FinalURL:   entry.URL,
 			}
 		}
-	} else {
-		html, statusCode, fetchErr := w.fetchURL(ctx, entry.URL)
-		if fetchErr != nil {
-			w.markFailed(ctx, entry, fmt.Sprintf("fetch error: %v", fetchErr))
-			return
+
+		captureDuration = time.Since(startTime)
+		return nil
+	})
+
+	if captureErr != nil {
+		logger.Error(captureErr, "Capture failed after retries", "used_fallback", usedFallback)
+
+		// Classify the error and mark failed
+		var appErr *appErrors.AppError
+		if errors.As(captureErr, &appErr) {
+			w.handleError(ctx, entry, appErr)
+		} else {
+			w.handleError(ctx, entry, appErrors.NewExternalError(appErrors.CodeArchiveFailed, "Archive capture failed", captureErr))
 		}
-		capture = &service.PlaywrightResult{
-			HTML:       html,
-			StatusCode: statusCode,
-			FinalURL:   entry.URL,
-		}
+		return
 	}
 
 	if capture == nil {
-		w.markFailed(ctx, entry, "empty capture result")
+		w.handleError(ctx, entry, appErrors.NewValidationError(appErrors.CodeInvalidInput, "empty capture result"))
 		return
 	}
 	if capture.StatusCode >= 400 {
-		w.markFailed(ctx, entry, fmt.Sprintf("HTTP status %d", capture.StatusCode))
+		w.handleError(ctx, entry, appErrors.NewValidationError(appErrors.CodeInvalidInput, fmt.Sprintf("HTTP status %d", capture.StatusCode)))
 		return
 	}
+
+	// Log metrics
+	logger.Info("Capture completed",
+		"duration_ms", captureDuration.Milliseconds(),
+		"used_fallback", usedFallback,
+		"status_code", capture.StatusCode,
+	)
 
 	if entry.ThumbnailPath == "" && capture.Screenshot != "" {
 		if _, err := w.thumbnailService.SaveFromDataURL(capture.Screenshot, entry.ID); err == nil {
@@ -323,26 +392,26 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 		archivePath = bundle.Revision.IndexPath
 		if w.archiveRevisionRepo != nil {
 			if err := w.archiveRevisionRepo.Create(ctx, bundle.Revision); err != nil {
-				log.Printf("Error persisting archive revision for %s: %v", entryID, err)
+				logger.Error(err, "Error persisting archive revision")
 			}
 		}
 		if w.archiveAssetRepo != nil {
 			if err := w.archiveAssetRepo.CreateBatch(ctx, bundle.Assets); err != nil {
-				log.Printf("Error persisting archive assets for %s: %v", entryID, err)
+				logger.Error(err, "Error persisting archive assets")
 			}
 		}
 
 		// Extract thumbnail candidates from the revision's image assets
 		if w.thumbnailCandidateRepo != nil && bundle.Revision != nil {
 			if err := w.extractThumbnailCandidates(ctx, entry.ID, bundle.Revision.ID); err != nil {
-				log.Printf("Error extracting thumbnail candidates for %s: %v", entryID, err)
+				logger.Error(err, "Error extracting thumbnail candidates")
 			}
 		}
 		if err := w.writeCaptureDiagnostics(bundle.Revision.RootPath, capture); err != nil {
-			log.Printf("Error writing capture diagnostics for %s: %v", entryID, err)
+			logger.Error(err, "Error writing capture diagnostics")
 		}
 		if err := w.enforceRevisionRetention(ctx, entry.ID); err != nil {
-			log.Printf("Error enforcing retention for %s: %v", entryID, err)
+			logger.Error(err, "Error enforcing retention")
 		}
 		entry.ArchiveCurrentRevisionID = &bundle.Revision.ID
 		switch bundle.Revision.Status {
@@ -369,7 +438,7 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 
 	metadata, err := w.metadataExtractor.Extract(capture.HTML, entry.URL)
 	if err != nil {
-		log.Printf("Error extracting metadata for entry %s: %v", entryID, err)
+		logger.Warn("Error extracting metadata", "error", err)
 		metadata = &service.Metadata{}
 	}
 	if metadata.Title != "" && entry.Title == "" {
@@ -393,11 +462,11 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 	entry.ArchivePath = archivePath
 	entry.ArchiveStatus = finalStatus
 	if err := w.entryRepo.Update(ctx, entry); err != nil {
-		log.Printf("Error updating entry: %v", err)
+		logger.Error(err, "Error updating entry")
 		return
 	}
 
-	log.Printf("Successfully archived entry %s to %s", entryID, archivePath)
+	logger.Info("Successfully archived entry", "archive_path", archivePath)
 }
 
 // fetchURL fetches the content of a URL.
@@ -488,7 +557,31 @@ func (w *ArchiveWorker) markFailed(ctx context.Context, entry *model.CatalogEntr
 	entry.ArchiveStatus = model.ArchiveStatusFailed
 	entry.MetadataRaw = []byte(fmt.Sprintf(`{"error": "%s"}`, reason))
 	if err := w.entryRepo.Update(ctx, entry); err != nil {
-		log.Printf("Error marking entry failed: %v", err)
+		w.logger.WithContext(ctx).With(slog.String("entry_id", entry.ID)).Error(err, "Error marking entry failed")
+	}
+}
+
+// handleError handles errors during job processing with proper error classification
+func (w *ArchiveWorker) handleError(ctx context.Context, entry *model.CatalogEntry, err *appErrors.AppError) {
+	logger := w.logger.WithContext(ctx).With(slog.String("entry_id", entry.ID))
+
+	logger.Error(err, "Job failed",
+		slog.String("error_code", string(err.Code)),
+		slog.String("error_category", string(err.Category)),
+		slog.Bool("retryable", err.Retryable),
+	)
+
+	entry.ArchiveStatus = model.ArchiveStatusFailed
+	if err.Context != nil {
+		if jsonBytes, jsonErr := json.Marshal(err.Context); jsonErr == nil {
+			entry.MetadataRaw = jsonBytes
+		}
+	} else {
+		entry.MetadataRaw = []byte(fmt.Sprintf(`{"error": "%s", "code": "%s"}`, err.Message, err.Code))
+	}
+
+	if updateErr := w.entryRepo.Update(ctx, entry); updateErr != nil {
+		logger.Error(updateErr, "Error updating entry status after failure")
 	}
 }
 
@@ -511,7 +604,7 @@ func (w *ArchiveWorker) PollPendingEntries(ctx context.Context, interval time.Du
 func (w *ArchiveWorker) queuePendingEntries(ctx context.Context) {
 	entries, err := w.entryRepo.FindPendingForArchiving(ctx, 50)
 	if err != nil {
-		log.Printf("Error fetching pending entries: %v", err)
+		w.logger.WithContext(ctx).Error(err, "Error fetching pending entries")
 		return
 	}
 
@@ -586,7 +679,7 @@ func (w *ArchiveWorker) enforceRevisionRetention(ctx context.Context, entryID st
 			_ = os.RemoveAll(r.RootPath)
 		}
 		if err := w.archiveRevisionRepo.DeleteByID(ctx, r.ID); err != nil {
-			log.Printf("failed to delete old revision record %s: %v", r.ID, err)
+			w.logger.WithContext(ctx).With(slog.String("revision_id", r.ID)).Error(err, "failed to delete old revision record")
 		}
 	}
 	return nil
@@ -638,12 +731,12 @@ func (w *ArchiveWorker) extractThumbnailCandidates(ctx context.Context, entryID,
 	// Store candidates in DB
 	for _, c := range candidates {
 		if err := w.thumbnailCandidateRepo.Create(ctx, c); err != nil {
-			log.Printf("Failed to create thumbnail candidate %s: %v", c.ID, err)
+			w.logger.WithContext(ctx).With(slog.String("candidate_id", c.ID)).Error(err, "Failed to create thumbnail candidate")
 		}
 	}
 
 	if len(candidates) > 0 {
-		log.Printf("Extracted %d thumbnail candidates for entry %s", len(candidates), entryID)
+		w.logger.WithContext(ctx).With(slog.String("entry_id", entryID)).Info("Extracted thumbnail candidates", slog.Int("count", len(candidates)))
 	}
 	return nil
 }

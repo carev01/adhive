@@ -33,7 +33,7 @@ type CatalogEntry struct {
 	CreatedAt                 time.Time        `json:"created_at"`
 	UpdatedAt                 time.Time        `json:"updated_at"`
 	LastCheckedAt             *time.Time       `json:"last_checked_at"`
-	ImportedFrom              string           `json:"imported_from" gorm:"type:varchar(50"`
+	ImportedFrom              string           `json:"imported_from" gorm:"type:varchar(50)"`
 }
 
 // TableName specifies the table name for GORM

@@ -1,7 +1,39 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
 
 // Base API URL - would typically come from env
 const API_BASE = '/api/v1';
+
+// Helper to handle API responses and auto-redirect on 401
+async function handleApiResponse(response: Response): Promise<Response> {
+  if (response.status === 401) {
+    // Clear any stored auth state
+    localStorage.removeItem('auth_token');
+    // Get current URL for return redirect
+    const currentUrl = get(page).url.pathname;
+    const returnUrl = encodeURIComponent(currentUrl);
+    // Redirect to login page with return URL
+    await goto(`/login?returnUrl=${returnUrl}`);
+    throw new Error('Unauthorized - redirecting to login');
+  }
+  return response;
+}
+
+// Helper to make API calls with automatic 401 handling
+async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...getAuthHeaders(),
+      ...options.headers,
+    },
+    credentials: 'include',
+  });
+  
+  await handleApiResponse(response);
+  return response;
+}
 
 export interface Entry {
   id: string;
@@ -103,12 +135,7 @@ export async function fetchEntries(params: {
   if (params.has_interaction) searchParams.set('has_interaction', params.has_interaction.toString());
   if (params.min_score) searchParams.set('min_score', params.min_score.toString());
 
-  const response = await fetch(`${API_BASE}/entries?${searchParams}`, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/entries?${searchParams}`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch entries: ${response.statusText}`);
@@ -119,12 +146,7 @@ export async function fetchEntries(params: {
 
 // Sources API - fetch unique sources/domains from user's entries
 export async function fetchSources(): Promise<string[]> {
-  const response = await fetch(`${API_BASE}/entries/sources`, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/entries/sources`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch sources: ${response.statusText}`);
@@ -135,12 +157,7 @@ export async function fetchSources(): Promise<string[]> {
 }
 
 export async function fetchLocations(): Promise<string[]> {
-  const response = await fetch(`${API_BASE}/entries/locations`, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/entries/locations`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch locations: ${response.statusText}`);
@@ -152,13 +169,11 @@ export async function fetchLocations(): Promise<string[]> {
 
 // Bulk operations
 export async function bulkTagEntries(entryIds: string[], tagIds: string[], action: 'add' | 'remove'): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/bulk/tag`, {
+  const response = await apiFetch(`${API_BASE}/entries/bulk/tag`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ entry_ids: entryIds, tag_ids: tagIds, action }),
   });
 
@@ -168,13 +183,11 @@ export async function bulkTagEntries(entryIds: string[], tagIds: string[], actio
 }
 
 export async function bulkDeleteEntries(entryIds: string[]): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/bulk/delete`, {
+  const response = await apiFetch(`${API_BASE}/entries/bulk/delete`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ entry_ids: entryIds }),
   });
 
@@ -184,13 +197,11 @@ export async function bulkDeleteEntries(entryIds: string[]): Promise<void> {
 }
 
 export async function bulkArchiveEntries(entryIds: string[]): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/bulk/archive`, {
+  const response = await apiFetch(`${API_BASE}/entries/bulk/archive`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ entry_ids: entryIds }),
   });
 
@@ -200,12 +211,7 @@ export async function bulkArchiveEntries(entryIds: string[]): Promise<void> {
 }
 
 export async function fetchEntry(id: string): Promise<Entry> {
-  const response = await fetch(`${API_BASE}/entries/${id}`, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/entries/${id}`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch entry: ${response.statusText}`);
@@ -215,13 +221,11 @@ export async function fetchEntry(id: string): Promise<Entry> {
 }
 
 export async function createEntry(url: string): Promise<Entry> {
-  const response = await fetch(`${API_BASE}/entries`, {
+  const response = await apiFetch(`${API_BASE}/entries`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ url }),
   });
 
@@ -233,13 +237,11 @@ export async function createEntry(url: string): Promise<Entry> {
 }
 
 export async function updateEntry(id: string, data: Partial<Entry>): Promise<Entry> {
-  const response = await fetch(`${API_BASE}/entries/${id}`, {
+  const response = await apiFetch(`${API_BASE}/entries/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify(data),
   });
 
@@ -251,12 +253,8 @@ export async function updateEntry(id: string, data: Partial<Entry>): Promise<Ent
 }
 
 export async function deleteEntry(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/${id}`, {
+  const response = await apiFetch(`${API_BASE}/entries/${id}`, {
     method: 'DELETE',
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -266,12 +264,7 @@ export async function deleteEntry(id: string): Promise<void> {
 
 // Tags API
 export async function fetchTags(): Promise<Tag[]> {
-  const response = await fetch(`${API_BASE}/tags`, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/tags`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch tags: ${response.statusText}`);
@@ -283,13 +276,11 @@ export async function fetchTags(): Promise<Tag[]> {
 }
 
 export async function createTag(name: string, color: string): Promise<Tag> {
-  const response = await fetch(`${API_BASE}/tags`, {
+  const response = await apiFetch(`${API_BASE}/tags`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ name, color }),
   });
 
@@ -301,13 +292,11 @@ export async function createTag(name: string, color: string): Promise<Tag> {
 }
 
 export async function updateTag(id: string, name: string, color: string): Promise<Tag> {
-  const response = await fetch(`${API_BASE}/tags/${id}`, {
+  const response = await apiFetch(`${API_BASE}/tags/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ name, color }),
   });
 
@@ -319,12 +308,8 @@ export async function updateTag(id: string, name: string, color: string): Promis
 }
 
 export async function deleteTag(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/tags/${id}`, {
+  const response = await apiFetch(`${API_BASE}/tags/${id}`, {
     method: 'DELETE',
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -333,13 +318,11 @@ export async function deleteTag(id: string): Promise<void> {
 }
 
 export async function addTagToEntry(entryId: string, tagId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/tags`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/tags`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify({ tag_id: tagId }),
   });
 
@@ -349,12 +332,8 @@ export async function addTagToEntry(entryId: string, tagId: string): Promise<voi
 }
 
 export async function removeTagFromEntry(entryId: string, tagId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/tags/${tagId}`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/tags/${tagId}`, {
     method: 'DELETE',
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -370,12 +349,7 @@ export const error = writable<string | null>(null);
 
 // Interaction API
 export async function fetchInteraction(entryId: string): Promise<Interaction | null> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/interaction`, {
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/interaction`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch interaction: ${response.statusText}`);
@@ -392,13 +366,11 @@ export async function upsertInteraction(entryId: string, data: {
   contacted_at?: string;
   purchased_at?: string;
 }): Promise<Interaction> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/interaction`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/interaction`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify(data),
   });
 
@@ -410,12 +382,8 @@ export async function upsertInteraction(entryId: string, data: {
 }
 
 export async function deleteInteraction(entryId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/interaction`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/interaction`, {
     method: 'DELETE',
-    headers: {
-      ...getAuthHeaders(),
-    },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -429,13 +397,11 @@ export async function fetchRandomEntry(params: {
   include_tags?: string[];
   exclude_tags?: string[];
 } = {}): Promise<Entry> {
-  const response = await fetch(`${API_BASE}/entries/random`, {
+  const response = await apiFetch(`${API_BASE}/entries/random`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
     },
-    credentials: 'include',
     body: JSON.stringify(params),
   });
 
@@ -447,10 +413,7 @@ export async function fetchRandomEntry(params: {
 }
 
 export async function fetchArchiveRevisions(entryId: string): Promise<ArchiveRevision[]> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/archive/revisions`, {
-    headers: { ...getAuthHeaders() },
-    credentials: 'include',
-  });
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/archive/revisions`);
   if (!response.ok) {
     throw new Error(`Failed to fetch archive revisions: ${response.statusText}`);
   }
@@ -459,10 +422,8 @@ export async function fetchArchiveRevisions(entryId: string): Promise<ArchiveRev
 }
 
 export async function refreshArchive(entryId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/archive/refresh`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/archive/refresh`, {
     method: 'POST',
-    headers: { ...getAuthHeaders() },
-    credentials: 'include',
   });
   if (!response.ok) {
     throw new Error(`Failed to refresh archive: ${response.statusText}`);
@@ -470,10 +431,8 @@ export async function refreshArchive(entryId: string): Promise<void> {
 }
 
 export async function deleteArchiveRevision(entryId: string, revisionId: string): Promise<{ deleted: boolean }> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/archive/revisions/${revisionId}`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/archive/revisions/${revisionId}`, {
     method: 'DELETE',
-    headers: { ...getAuthHeaders() },
-    credentials: 'include',
   });
   if (!response.ok) {
     throw new Error(`Failed to delete revision: ${response.statusText}`);
@@ -482,13 +441,11 @@ export async function deleteArchiveRevision(entryId: string, revisionId: string)
 }
 
 export async function retryInManualMode(entryId: string, makeDefaultForDomain: boolean): Promise<void> {
-  const response = await fetch(`${API_BASE}/entries/${entryId}/archive/refresh`, {
+  const response = await apiFetch(`${API_BASE}/entries/${entryId}/archive/refresh`, {
     method: 'POST',
     headers: { 
-      ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
-    credentials: 'include',
     body: JSON.stringify({
       manual_mode: true,
       add_to_human_domains: makeDefaultForDomain,
@@ -500,13 +457,11 @@ export async function retryInManualMode(entryId: string, makeDefaultForDomain: b
 }
 
 export async function addToHumanDomains(domain: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/admin/human-domains`, {
+  const response = await apiFetch(`${API_BASE}/admin/human-domains`, {
     method: 'POST',
     headers: { 
-      ...getAuthHeaders(),
       'Content-Type': 'application/json',
     },
-    credentials: 'include',
     body: JSON.stringify({ domain }),
   });
   if (!response.ok) {

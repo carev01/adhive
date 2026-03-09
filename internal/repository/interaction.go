@@ -25,19 +25,27 @@ func (r *InteractionRepository) GetByEntryAndUser(ctx context.Context, entryID, 
 		Where("entry_id = ? AND user_id = ?", entryID, userID).
 		First(&interaction).Error
 	if err != nil {
-		return nil, err
+		return nil, WrapDBError(err, "Interaction", entryID)
 	}
 	return &interaction, nil
 }
 
 // Create creates a new interaction
 func (r *InteractionRepository) Create(ctx context.Context, interaction *model.Interaction) error {
-	return r.db.WithContext(ctx).Create(interaction).Error
+	err := r.db.WithContext(ctx).Create(interaction).Error
+	if err != nil {
+		return WrapDBError(err, "Interaction", interaction.ID)
+	}
+	return nil
 }
 
 // Update updates an existing interaction
 func (r *InteractionRepository) Update(ctx context.Context, interaction *model.Interaction) error {
-	return r.db.WithContext(ctx).Save(interaction).Error
+	err := r.db.WithContext(ctx).Save(interaction).Error
+	if err != nil {
+		return WrapDBError(err, "Interaction", interaction.ID)
+	}
+	return nil
 }
 
 // Upsert creates or updates an interaction for an entry/user
@@ -56,7 +64,7 @@ func (r *InteractionRepository) Upsert(ctx context.Context, entryID, userID stri
 				Tried:   true, // Any interaction means the entry was tried
 			}
 		} else if err != nil {
-			return err
+			return WrapDBError(err, "Interaction", entryID)
 		}
 
 		// Apply updates (tried stays true once an interaction exists)
@@ -82,16 +90,17 @@ func (r *InteractionRepository) Upsert(ctx context.Context, entryID, userID stri
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, WrapDBError(err, "Interaction", entryID)
 	}
 	return &interaction, nil
 }
 
 // Delete deletes an interaction
 func (r *InteractionRepository) Delete(ctx context.Context, entryID, userID string) error {
-	return r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).
 		Where("entry_id = ? AND user_id = ?", entryID, userID).
 		Delete(&model.Interaction{}).Error
+	return WrapDBError(err, "Interaction", entryID)
 }
 
 // GetTriedEntryIDs gets all entry IDs that have been marked as tried
@@ -101,5 +110,5 @@ func (r *InteractionRepository) GetTriedEntryIDs(ctx context.Context, userID str
 		Model(&model.Interaction{}).
 		Where("user_id = ? AND tried = ?", userID, true).
 		Pluck("entry_id", &entryIDs).Error
-	return entryIDs, err
+	return entryIDs, WrapDBError(err, "Interaction", "")
 }
