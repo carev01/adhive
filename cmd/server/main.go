@@ -136,7 +136,9 @@ func main() {
 		log.Printf("Warning: Failed to create FTS5: %v", err)
 	} else {
 		// Repopulate FTS from existing data
-		migrations.RepopulateFTS5(db)
+		if err := migrations.RepopulateFTS5(db); err != nil {
+			log.Printf("Warning: Failed to repopulate FTS5: %v", err)
+		}
 	}
 
 	// Repositories

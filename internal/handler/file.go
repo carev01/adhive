@@ -164,19 +164,6 @@ func rewriteArchiveAssetLinks(html string, revID, entryID string) string {
 	return result
 }
 
-func (h *FileHandler) loadRevisionManifest(entryID, revisionID string) (*model.ArchiveManifest, error) {
-	manifestPath := filepath.Join(h.fileService.GetConfig().ArchivesDir, entryID, revisionID, "manifest.json")
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return nil, err
-	}
-	var manifest model.ArchiveManifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
-	}
-	return &manifest, nil
-}
-
 // NewFileHandler creates a new FileHandler
 func NewFileHandler(fileService *service.FileService, entryRepo *repository.EntryRepository, thumbnailCandidateRepo *repository.ThumbnailCandidateRepository) *FileHandler {
 	return &FileHandler{

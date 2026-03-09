@@ -358,9 +358,6 @@ func (b *ArchiveBundler) persistAssetFromURL(ctx context.Context, rawURL, assets
 	if ext == "" {
 		if ct := resp.Header.Get("Content-Type"); ct != "" {
 			ext = mimeToExt(ct)
-			if ext != "" {
-				// ext is set, filename not needed since we use hash-based name
-			}
 		}
 	}
 	if ext == "" {

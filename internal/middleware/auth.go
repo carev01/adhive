@@ -53,7 +53,7 @@ func (m *AuthMiddleware) Authenticate() gin.HandlerFunc {
 
 		// Check if expired
 		if session.ExpiresAt.Before(time.Now()) {
-			m.sessionRepo.Delete(sessionID)
+			_ = m.sessionRepo.Delete(sessionID)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"type":   "about:blank",
 				"title":  "Unauthorized",

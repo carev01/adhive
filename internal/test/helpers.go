@@ -61,9 +61,9 @@ func (r *ResponseRecorder) AssertStatus(t TestingT, expected int) {
 // AssertJSON checks if the response contains expected JSON
 func (r *ResponseRecorder) AssertJSON(t TestingT, expected string) {
 	var expectedJSON, actualJSON map[string]interface{}
-	json.Unmarshal([]byte(expected), &expectedJSON)
-	json.Unmarshal(r.Body.Bytes(), &actualJSON)
-	
+	_ = json.Unmarshal([]byte(expected), &expectedJSON)
+	_ = json.Unmarshal(r.Body.Bytes(), &actualJSON)
+
 	// Simple comparison - just check keys exist
 	for key := range expectedJSON {
 		if _, ok := actualJSON[key]; !ok {

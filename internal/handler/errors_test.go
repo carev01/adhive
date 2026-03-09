@@ -213,9 +213,11 @@ func TestSendError_NilError(t *testing.T) {
 	// Should not panic
 	SendError(c, nil)
 
+	// Nil error should not set any status (default 200)
+	// But the function returns early, so no response is sent
+	// w.Code should still be the default 200
 	if w.Code != http.StatusOK {
-		// Nil error should not set any status (default 200)
-		// But the function returns early, so no response is sent
+		t.Errorf("Status = %v, want %v", w.Code, http.StatusOK)
 	}
 }
 

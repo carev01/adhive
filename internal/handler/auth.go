@@ -102,7 +102,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	// Delete any existing session to prevent session fixation attacks
 	existingSessionID, _ := c.Cookie("session")
 	if existingSessionID != "" {
-		h.sessionRepo.Delete(existingSessionID)
+		_ = h.sessionRepo.Delete(existingSessionID)
 	}
 
 	// Create new session with fresh ID
@@ -160,7 +160,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Delete any existing session to prevent session fixation attacks
 	existingSessionID, _ := c.Cookie("session")
 	if existingSessionID != "" {
-		h.sessionRepo.Delete(existingSessionID)
+		_ = h.sessionRepo.Delete(existingSessionID)
 	}
 
 	// Create new session with fresh ID
@@ -192,7 +192,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	sessionID, err := c.Cookie("session")
 	if err == nil && sessionID != "" {
-		h.sessionRepo.Delete(sessionID)
+		_ = h.sessionRepo.Delete(sessionID)
 	}
 
 	// Clear session cookie

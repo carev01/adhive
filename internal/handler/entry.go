@@ -509,11 +509,9 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 			return
 		}
 
-		// Delete thumbnail if exists
+		// Delete thumbnail if exists (best effort, ignore errors)
 		thumbDir := filepath.Join(h.storageConfig.ThumbDir, entry.ID)
-		if err := os.RemoveAll(thumbDir); err != nil {
-			// Log but don't fail
-		}
+		_ = os.RemoveAll(thumbDir)
 	}
 
 	err = h.entryRepo.Delete(c.Request.Context(), id, userID)

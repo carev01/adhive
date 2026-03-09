@@ -128,9 +128,6 @@ func (rl *AuthRateLimiter) isRegisterAllowed(ip string) bool {
 	return true
 }
 
-// GlobalRateLimiter is the global rate limiter instance
-var globalRateLimiter = NewRateLimiter(100, 1*time.Minute)
-
 // AuthRateLimiterInstance is the auth-specific rate limiter
 var authRateLimiter = NewAuthRateLimiter()
 

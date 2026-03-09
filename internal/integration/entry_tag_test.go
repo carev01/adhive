@@ -110,31 +110,6 @@ func createTestUser(td *TestDatabaseWithEntries, email string) string {
 	return session.ID
 }
 
-// Helper function to create a session for existing user
-func createTestSession(td *TestDatabaseWithEntries, userID string) string {
-	session := &model.Session{
-		ID:        "session-" + userID,
-		UserID:    userID,
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		CreatedAt: time.Now(),
-	}
-	_ = td.SessionRepo.Create(session)
-	return session.ID
-}
-
-// Helper function to create an entry for testing
-func createEntryForUser(td *TestDatabaseWithEntries, userID, url, title string) *model.CatalogEntry {
-	entry := &model.CatalogEntry{
-		ID:            "entry-" + url,
-		UserID:        userID,
-		URL:           url,
-		Title:         title,
-		ArchiveStatus: model.ArchiveStatusPending,
-	}
-	_ = td.EntryRepo.Create(context.Background(), entry)
-	return entry
-}
-
 // ============ Entry API Tests ============
 
 func TestEntry_Create(t *testing.T) {
@@ -223,7 +198,7 @@ func TestEntry_Create_DuplicateURL(t *testing.T) {
 		URL:           "https://example.com/duplicate",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -293,8 +268,8 @@ func TestEntry_List(t *testing.T) {
 	// Create some entries
 	entry1 := &model.CatalogEntry{ID: "entry-1", UserID: "user-listtest@example.com", URL: "https://example.com/1", ArchiveStatus: model.ArchiveStatusPending}
 	entry2 := &model.CatalogEntry{ID: "entry-2", UserID: "user-listtest@example.com", URL: "https://example.com/2", ArchiveStatus: model.ArchiveStatusSuccess}
-	td.EntryRepo.Create(context.Background(), entry1)
-	td.EntryRepo.Create(context.Background(), entry2)
+	_ = td.EntryRepo.Create(context.Background(), entry1)
+	_ = td.EntryRepo.Create(context.Background(), entry2)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -332,7 +307,7 @@ func TestEntry_List_Pagination(t *testing.T) {
 			URL:           "https://example.com/" + string(rune(i)),
 			ArchiveStatus: model.ArchiveStatusPending,
 		}
-		td.EntryRepo.Create(context.Background(), entry)
+		_ = td.EntryRepo.Create(context.Background(), entry)
 	}
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
@@ -349,7 +324,7 @@ func TestEntry_List_Pagination(t *testing.T) {
 	}
 
 	var resp handler.EntryListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Total != 25 {
 		t.Errorf("Expected total 25, got %d", resp.Total)
@@ -380,7 +355,7 @@ func TestEntry_List_Empty(t *testing.T) {
 	}
 
 	var resp handler.EntryListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Total != 0 {
 		t.Errorf("Expected 0 entries, got %d", resp.Total)
@@ -406,7 +381,7 @@ func TestEntry_Get(t *testing.T) {
 		Title:         "Test Entry",
 		ArchiveStatus: model.ArchiveStatusSuccess,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -421,7 +396,7 @@ func TestEntry_Get(t *testing.T) {
 	}
 
 	var resp handler.EntryResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Title != "Test Entry" {
 		t.Errorf("Expected title 'Test Entry', got %s", resp.Title)
@@ -458,7 +433,7 @@ func TestEntry_Get_OtherUserEntry(t *testing.T) {
 		URL:           "https://example.com/other",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -485,7 +460,7 @@ func TestEntry_Update(t *testing.T) {
 		URL:           "https://example.com/update",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -509,7 +484,7 @@ func TestEntry_Update(t *testing.T) {
 	}
 
 	var resp handler.EntryResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Title != "Updated Title" {
 		t.Errorf("Expected title 'Updated Title', got %s", resp.Title)
@@ -554,7 +529,7 @@ func TestEntry_Delete(t *testing.T) {
 		URL:           "https://example.com/delete",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -708,8 +683,8 @@ func TestTag_List(t *testing.T) {
 	// Create tags
 	tag1 := &model.Tag{ID: "tag-1", UserID: "user-taglist@example.com", Name: "Tag1", Color: "#FF0000"}
 	tag2 := &model.Tag{ID: "tag-2", UserID: "user-taglist@example.com", Name: "Tag2", Color: "#00FF00"}
-	td.TagRepo.Create(tag1)
-	td.TagRepo.Create(tag2)
+	_ = td.TagRepo.Create(tag1)
+	_ = td.TagRepo.Create(tag2)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -724,7 +699,7 @@ func TestTag_List(t *testing.T) {
 	}
 
 	var resp []*handler.TagResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if len(resp) != 2 {
 		t.Errorf("Expected 2 tags, got %d", len(resp))
@@ -749,9 +724,9 @@ func TestTag_List_Empty(t *testing.T) {
 	}
 
 	var resp []*handler.TagResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
-	if resp != nil && len(resp) != 0 {
+	if len(resp) != 0 {
 		t.Errorf("Expected 0 tags, got %d", len(resp))
 	}
 }
@@ -762,7 +737,7 @@ func TestTag_Get(t *testing.T) {
 	sessionID := createTestUser(td, "tagget@example.com")
 
 	tag := &model.Tag{ID: "tag-get", UserID: "user-tagget@example.com", Name: "GetTag", Color: "#0000FF"}
-	td.TagRepo.Create(tag)
+	_ = td.TagRepo.Create(tag)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -777,7 +752,7 @@ func TestTag_Get(t *testing.T) {
 	}
 
 	var resp handler.TagResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Name != "GetTag" {
 		t.Errorf("Expected name 'GetTag', got %s", resp.Name)
@@ -808,7 +783,7 @@ func TestTag_Update(t *testing.T) {
 	sessionID := createTestUser(td, "tagupdate@example.com")
 
 	tag := &model.Tag{ID: "tag-update", UserID: "user-tagupdate@example.com", Name: "OldName", Color: "#FF0000"}
-	td.TagRepo.Create(tag)
+	_ = td.TagRepo.Create(tag)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -829,7 +804,7 @@ func TestTag_Update(t *testing.T) {
 	}
 
 	var resp handler.TagResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Name != "NewName" {
 		t.Errorf("Expected name 'NewName', got %s", resp.Name)
@@ -868,7 +843,7 @@ func TestTag_Delete(t *testing.T) {
 	sessionID := createTestUser(td, "tagdelete@example.com")
 
 	tag := &model.Tag{ID: "tag-delete", UserID: "user-tagdelete@example.com", Name: "DeleteTag", Color: "#FF0000"}
-	td.TagRepo.Create(tag)
+	_ = td.TagRepo.Create(tag)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -899,8 +874,8 @@ func TestTag_AddEntryTag(t *testing.T) {
 	// Create entry and tag
 	entry := &model.CatalogEntry{ID: "entry-assoc", UserID: "user-assoctest@example.com", URL: "https://example.com", ArchiveStatus: model.ArchiveStatusPending}
 	tag := &model.Tag{ID: "tag-assoc", UserID: "user-assoctest@example.com", Name: "AssocTag", Color: "#FF0000"}
-	td.EntryRepo.Create(context.Background(), entry)
-	td.TagRepo.Create(tag)
+	_ = td.EntryRepo.Create(context.Background(), entry)
+	_ = td.TagRepo.Create(tag)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -925,7 +900,7 @@ func TestTag_AddEntryTag_InvalidTag(t *testing.T) {
 	sessionID := createTestUser(td, "assoctest2@example.com")
 
 	entry := &model.CatalogEntry{ID: "entry-assoc2", UserID: "user-assoctest2@example.com", URL: "https://example.com", ArchiveStatus: model.ArchiveStatusPending}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 
@@ -951,11 +926,11 @@ func TestTag_RemoveEntryTag(t *testing.T) {
 
 	entry := &model.CatalogEntry{ID: "entry-assoc3", UserID: "user-assoctest3@example.com", URL: "https://example.com", ArchiveStatus: model.ArchiveStatusPending}
 	tag := &model.Tag{ID: "tag-assoc3", UserID: "user-assoctest3@example.com", Name: "AssocTag3", Color: "#FF0000"}
-	td.EntryRepo.Create(context.Background(), entry)
-	td.TagRepo.Create(tag)
+	_ = td.EntryRepo.Create(context.Background(), entry)
+	_ = td.TagRepo.Create(tag)
 
 	// Add the association
-	td.TagRepo.AddEntryTag("entry-assoc3", "tag-assoc3")
+	_ = td.TagRepo.AddEntryTag("entry-assoc3", "tag-assoc3")
 
 	sessionCookie := &http.Cookie{Name: "session", Value: sessionID}
 

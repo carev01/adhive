@@ -310,7 +310,9 @@ func main() {
 			logError(ImportError{Phase: "thumbnail-conversion", Error: err.Error()})
 		} else {
 			// Auto-migrate thumbnail_candidates table
-			db.AutoMigrate(&model.ThumbnailCandidate{})
+			if err := db.AutoMigrate(&model.ThumbnailCandidate{}); err != nil {
+				logWarn("Failed to migrate thumbnail_candidates table: %v", err)
+			}
 			
 			// Get thumbnail candidate repo
 			thumbRepo := repository.NewThumbnailCandidateRepository(db)
