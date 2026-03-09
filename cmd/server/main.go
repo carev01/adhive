@@ -25,6 +25,26 @@ import (
 	"gorm.io/gorm"
 )
 
+// Version info - set via ldflags during build
+var (
+	version    = "latest"
+	commit     = "unknown"
+	buildDate  = "unknown"
+)
+
+func init() {
+	// Allow environment variables to override build-time values
+	if v := os.Getenv("APP_VERSION"); v != "" {
+		version = v
+	}
+	if c := os.Getenv("APP_COMMIT"); c != "" {
+		commit = c
+	}
+	if b := os.Getenv("APP_BUILD_DATE"); b != "" {
+		buildDate = b
+	}
+}
+
 // getIntEnv returns an integer from environment or default
 func getIntEnv(key string, defaultVal int) int {
 	if val := os.Getenv(key); val != "" {
@@ -259,6 +279,15 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 	// Health check - public
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// Version info - public
+	r.GET("/version", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"version":    version,
+			"commit":     commit,
+			"build_date": buildDate,
+		})
 	})
 
 	// API v1 routes

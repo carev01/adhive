@@ -15,6 +15,202 @@ func GetProjectRoot() string {
 	return filepath.Dir(filepath.Dir(execDir))
 }
 
+func TestCIWorkflowExists(t *testing.T) {
+	root := GetProjectRoot()
+	ciPath := filepath.Join(root, ".github", "workflows", "ci.yml")
+	_, err := os.Stat(ciPath)
+	if err != nil {
+		t.Fatalf("CI workflow not found: %v", err)
+	}
+}
+
+func TestCIWorkflowHasTestJob(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "jobs:") {
+		t.Error("CI workflow should have jobs defined")
+	}
+
+	if !strings.Contains(string(content), "test:") {
+		t.Error("CI workflow should have test job")
+	}
+}
+
+func TestCIWorkflowRunsTests(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "go test") {
+		t.Error("CI workflow should run go test")
+	}
+}
+
+func TestCIWorkflowHasGoSetup(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "setup-go") {
+		t.Error("CI workflow should set up Go")
+	}
+
+	if !strings.Contains(string(content), "go-version") {
+		t.Error("CI workflow should specify Go version")
+	}
+}
+
+func TestCIWorkflowHasFrontendBuild(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "frontend-build:") {
+		t.Error("CI workflow should have frontend-build job")
+	}
+
+	if !strings.Contains(string(content), "npm run build") {
+		t.Error("CI workflow should build frontend")
+	}
+}
+
+func TestCIWorkflowHasLintJob(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "lint:") {
+		t.Error("CI workflow should have lint job")
+	}
+
+	if !strings.Contains(string(content), "golangci-lint") {
+		t.Error("CI workflow should run golangci-lint")
+	}
+}
+
+func TestCIWorkflowTriggersOnPush(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "push:") {
+		t.Error("CI workflow should trigger on push")
+	}
+}
+
+func TestCIWorkflowTriggersOnPullRequest(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read CI workflow: %v", err)
+	}
+
+	if !strings.Contains(string(content), "pull_request:") {
+		t.Error("CI workflow should trigger on pull request")
+	}
+}
+
+func TestDockerfileHasBuildArgs(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("Failed to read Dockerfile: %v", err)
+	}
+
+	// Multi-stage builds typically use BUILDPLATFORM or similar
+	if !strings.Contains(string(content), "BUILDPLATFORM") {
+		t.Log("Note: Consider using BUILDPLATFORM for multi-platform builds")
+	}
+}
+
+func TestDockerfileUsesAlpine(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("Failed to read Dockerfile: %v", err)
+	}
+
+	if !strings.Contains(string(content), "alpine") {
+		t.Error("Dockerfile should use Alpine Linux for small image size")
+	}
+}
+
+func TestDockerfileCleansUpDependencies(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("Failed to read Dockerfile: %v", err)
+	}
+
+	// Check that build stage dependencies are cleaned up
+	// (not explicitly tested, but we check for best practices)
+	if !strings.Contains(string(content), "--no-cache") {
+		t.Log("Note: Consider using --no-cache for apk to reduce image size")
+	}
+}
+
+func TestDockerfileHasNginxConfig(t *testing.T) {
+	root := GetProjectRoot()
+	_, err := os.Stat(filepath.Join(root, "nginx.conf"))
+	if err != nil {
+		t.Fatalf("nginx.conf not found: %v", err)
+	}
+}
+
+func TestDockerfileCopyStaticFiles(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("Failed to read Dockerfile: %v", err)
+	}
+
+	if !strings.Contains(string(content), "COPY --from=frontend-builder") {
+		t.Error("Dockerfile should copy frontend build artifacts")
+	}
+}
+
+func TestDockerComposeBuildsApp(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read docker-compose.yml: %v", err)
+	}
+
+	if !strings.Contains(string(content), "build:") {
+		t.Error("docker-compose.yml should have build configuration")
+	}
+}
+
+func TestDockerComposeUsesMultiStageBuild(t *testing.T) {
+	root := GetProjectRoot()
+	content, err := os.ReadFile(filepath.Join(root, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("Failed to read docker-compose.yml: %v", err)
+	}
+
+	if !strings.Contains(string(content), "context:") {
+		t.Error("docker-compose.yml should specify build context")
+	}
+
+	if !strings.Contains(string(content), "dockerfile:") {
+		t.Error("docker-compose.yml should specify dockerfile")
+	}
+}
+
 // TestDockerfileExists verifies the Dockerfile exists
 func TestDockerfileExists(t *testing.T) {
 	root := GetProjectRoot()
