@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"regexp"
 
@@ -11,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // TagHandler handles tag HTTP requests
@@ -76,7 +74,7 @@ func (h *TagHandler) List(c *gin.Context) {
 
 	tags, err := h.tagRepo.FindByUserID(userID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tags", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -98,7 +96,7 @@ func (h *TagHandler) ListWithCount(c *gin.Context) {
 
 	tags, err := h.tagRepo.GetTagsWithCount(userID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tags with count", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -147,7 +145,7 @@ func (h *TagHandler) Create(c *gin.Context) {
 
 	err := h.tagRepo.Create(tag)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create tag", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -165,11 +163,8 @@ func (h *TagHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	tag, err := h.tagRepo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if tag == nil || tag.UserID != userID {
@@ -193,11 +188,8 @@ func (h *TagHandler) Update(c *gin.Context) {
 	// Get existing tag
 	tag, err := h.tagRepo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if tag == nil || tag.UserID != userID {
@@ -225,7 +217,7 @@ func (h *TagHandler) Update(c *gin.Context) {
 
 	err = h.tagRepo.Update(tag)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to update tag", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -245,11 +237,8 @@ func (h *TagHandler) Delete(c *gin.Context) {
 	// Verify ownership
 	tag, err := h.tagRepo.FindByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if tag == nil || tag.UserID != userID {
@@ -259,7 +248,7 @@ func (h *TagHandler) Delete(c *gin.Context) {
 
 	err = h.tagRepo.Delete(id)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete tag", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -288,11 +277,8 @@ func (h *TagHandler) AddEntryTag(c *gin.Context) {
 	// Verify tag belongs to user
 	tag, err := h.tagRepo.FindByID(req.TagID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if tag == nil || tag.UserID != userID {
@@ -302,7 +288,7 @@ func (h *TagHandler) AddEntryTag(c *gin.Context) {
 
 	err = h.tagRepo.AddEntryTag(entryID, req.TagID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to add tag to entry", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -323,11 +309,8 @@ func (h *TagHandler) RemoveEntryTag(c *gin.Context) {
 	// Verify tag belongs to user
 	tag, err := h.tagRepo.FindByID(tagID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeTagNotFound, "tag"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch tag", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if tag == nil || tag.UserID != userID {
@@ -337,7 +320,7 @@ func (h *TagHandler) RemoveEntryTag(c *gin.Context) {
 
 	err = h.tagRepo.RemoveEntryTag(entryID, tagID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to remove tag from entry", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 

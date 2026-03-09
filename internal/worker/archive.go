@@ -230,6 +230,10 @@ func (w *ArchiveWorker) processJob(ctx context.Context, entryID string) {
 	entry, err := w.entryRepo.GetByID(ctx, entryID)
 	if err != nil {
 		logger.Error(err, "Error finding entry")
+		// Create a minimal entry for error logging if not found
+		if entry == nil {
+			entry = &model.CatalogEntry{ID: entryID}
+		}
 		w.handleError(ctx, entry, appErrors.NewInternalError(appErrors.CodeEntryNotFound, "Entry not found", err).WithContext("entry_id", entryID))
 		return
 	}

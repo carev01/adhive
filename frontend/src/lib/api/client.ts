@@ -1,15 +1,18 @@
 import { writable, get } from 'svelte/store';
 import { goto } from '$app/navigation';
 import { page } from '$app/stores';
+import { getCSRFToken, clearCSRFToken } from './csrf';
 
 // Base API URL - would typically come from env
-const API_BASE = '/api/v1';
+export const API_BASE = '/api/v1';
 
 // Helper to handle API responses and auto-redirect on 401
 async function handleApiResponse(response: Response): Promise<Response> {
   if (response.status === 401) {
     // Clear any stored auth state
     localStorage.removeItem('auth_token');
+    // Clear CSRF token on auth failure
+    clearCSRFToken();
     // Get current URL for return redirect
     const currentUrl = get(page).url.pathname;
     const returnUrl = encodeURIComponent(currentUrl);
@@ -20,14 +23,22 @@ async function handleApiResponse(response: Response): Promise<Response> {
   return response;
 }
 
-// Helper to make API calls with automatic 401 handling
+// Helper to make API calls with automatic 401 handling and CSRF token
 async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const method = (options.method || 'GET').toUpperCase();
+  const isMutation = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+  
+  // Get CSRF token for mutations
+  const csrfToken = isMutation ? await getCSRFToken() : '';
+  
+  // Build headers
+  const headers = new Headers(options.headers as Record<string, string>);
+  headers.set('X-CSRF-Token', csrfToken);
+  
+  // Add CSRF token header for mutations
   const response = await fetch(url, {
     ...options,
-    headers: {
-      ...getAuthHeaders(),
-      ...options.headers,
-    },
+    headers,
     credentials: 'include',
   });
   

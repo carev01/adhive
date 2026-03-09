@@ -69,6 +69,7 @@
 					<input
 						type="email"
 						id="email"
+						autocomplete="username"
 						bind:value={email}
 						placeholder="you@example.com"
 						class="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
@@ -80,6 +81,7 @@
 					<input
 						type="password"
 						id="password"
+						autocomplete="current-password"
 						bind:value={password}
 						placeholder="••••••••"
 						class="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"

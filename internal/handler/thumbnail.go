@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"github.com/carev01/adhive/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // ThumbnailHandler handles thumbnail candidate APIs.
@@ -142,11 +140,8 @@ func (h *ThumbnailHandler) SelectCandidate(c *gin.Context) {
 
 	cand, err := h.thumbnailCandidateRepo.GetByID(c.Request.Context(), req.CandidateID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "candidate not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch candidate"})
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if cand.EntryID != entryID {

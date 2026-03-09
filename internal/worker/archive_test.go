@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/carev01/adhive/internal/logging"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/glebarez/sqlite"
@@ -79,6 +80,7 @@ func TestArchiveWorker_QueueJob_FullQueue(t *testing.T) {
 		dataDir:   "/tmp/test-archives",
 		jobChan:   make(chan string, 1), // Small queue
 		stopChan:  make(chan struct{}),
+		logger:    logging.Default(),
 	}
 	
 	// Fill the queue

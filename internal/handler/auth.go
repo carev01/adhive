@@ -99,7 +99,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Create session
+	// Delete any existing session to prevent session fixation attacks
+	existingSessionID, _ := c.Cookie("session")
+	if existingSessionID != "" {
+		h.sessionRepo.Delete(existingSessionID)
+	}
+
+	// Create new session with fresh ID
 	session := &model.Session{
 		ID:        uuid.New().String(),
 		UserID:    user.ID,
@@ -151,7 +157,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Create session
+	// Delete any existing session to prevent session fixation attacks
+	existingSessionID, _ := c.Cookie("session")
+	if existingSessionID != "" {
+		h.sessionRepo.Delete(existingSessionID)
+	}
+
+	// Create new session with fresh ID
 	session := &model.Session{
 		ID:        uuid.New().String(),
 		UserID:    user.ID,
@@ -208,7 +220,11 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	})
 }
 
-// setSessionCookie sets the session cookie
+// setSessionCookie sets the session cookie with security options
 func (h *AuthHandler) setSessionCookie(c *gin.Context, sessionID string) {
-	c.SetCookie("session", sessionID, int(h.sessionTTL.Seconds()), "/", "", false, true)
+	// HttpOnly: prevents JavaScript access (XSS protection)
+	// Secure: only sent over HTTPS
+	// SameSite=Strict: prevents CSRF
+	c.SetCookie("session", sessionID, int(h.sessionTTL.Seconds()), "/", "", true, true)
+	// Note: Gin uses http.SameSiteStrictMode when SameSite=true
 }

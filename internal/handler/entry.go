@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // EntryHandler handles catalog entry HTTP requests
@@ -192,7 +190,8 @@ func (h *EntryHandler) List(c *gin.Context) {
 	}
 
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entries", err))
+		// Pass error directly - SendError handles AppError types
+		SendError(c, err)
 		return
 	}
 
@@ -225,7 +224,8 @@ func (h *EntryHandler) Sources(c *gin.Context) {
 
 	sources, err := h.entryRepo.GetUserSources(c.Request.Context(), userID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch sources", err))
+		// Pass error directly - SendError handles AppError types
+		SendError(c, err)
 		return
 	}
 
@@ -242,7 +242,8 @@ func (h *EntryHandler) Locations(c *gin.Context) {
 
 	locations, err := h.entryRepo.GetUserLocations(c.Request.Context(), userID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch locations", err))
+		// Pass error directly - SendError handles AppError types
+		SendError(c, err)
 		return
 	}
 
@@ -278,7 +279,8 @@ func (h *EntryHandler) BulkTag(c *gin.Context) {
 	}
 
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "bulk tag operation failed", err))
+		// Pass error directly - SendError handles AppError types
+		SendError(c, err)
 		return
 	}
 
@@ -306,7 +308,8 @@ func (h *EntryHandler) BulkDelete(c *gin.Context) {
 
 	err := h.entryRepo.BulkDelete(c.Request.Context(), userID, req.EntryIDs)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "bulk delete failed", err))
+		// Pass error directly - SendError handles AppError types
+		SendError(c, err)
 		return
 	}
 
@@ -362,7 +365,7 @@ func (h *EntryHandler) Create(c *gin.Context) {
 
 	err := h.entryRepo.Create(c.Request.Context(), entry)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to create entry", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -385,11 +388,8 @@ func (h *EntryHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entry", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if entry == nil || entry.UserID != userID {
@@ -422,11 +422,8 @@ func (h *EntryHandler) Update(c *gin.Context) {
 	// Get existing entry
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entry", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if entry == nil || entry.UserID != userID {
@@ -466,7 +463,7 @@ func (h *EntryHandler) Update(c *gin.Context) {
 
 	err = h.entryRepo.Update(c.Request.Context(), entry)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to update entry", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -493,11 +490,8 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 	// Get entry first for file cleanup
 	entry, err := h.entryRepo.GetByID(c.Request.Context(), id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			SendError(c, apperrors.NewNotFoundError(apperrors.CodeEntryNotFound, "entry"))
-			return
-		}
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch entry", err))
+		// SendError handles AppError types (NotFoundError, etc.)
+		SendError(c, err)
 		return
 	}
 	if entry == nil || entry.UserID != userID {
@@ -511,7 +505,7 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 		archiveDir := filepath.Join(h.storageConfig.ArchivesDir, entry.ID)
 		if err := os.RemoveAll(archiveDir); err != nil {
 			// Log but don't fail the delete - DB delete is more important
-			SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete archive files", err))
+			SendError(c, err) // Pass error directly
 			return
 		}
 
@@ -524,7 +518,7 @@ func (h *EntryHandler) Delete(c *gin.Context) {
 
 	err = h.entryRepo.Delete(c.Request.Context(), id, userID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete entry", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 

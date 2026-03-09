@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +24,58 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
+
+// getIntEnv returns an integer from environment or default
+func getIntEnv(key string, defaultVal int) int {
+	if val := os.Getenv(key); val != "" {
+		if n, err := strconv.Atoi(val); err == nil {
+			return n
+		}
+	}
+	return defaultVal
+}
+
+// getDurationEnv returns a duration from environment or default
+func getDurationEnv(key string, defaultVal time.Duration) time.Duration {
+	if val := os.Getenv(key); val != "" {
+		if d, err := time.ParseDuration(val); err == nil {
+			return d
+		}
+	}
+	return defaultVal
+}
+
+// getCORSOrigins returns allowed CORS origins from environment variable.
+// Development defaults: localhost:5173, localhost:3000, localhost:8080
+// Production default: empty (secure by default)
+func getCORSOrigins() []string {
+	envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	
+	if envOrigins == "" {
+		// Check if running in development mode (no DB_PASSWORD set = local dev)
+		dbPassword := os.Getenv("DB_PASSWORD")
+		if dbPassword == "" {
+			// Development mode - use default localhost origins
+			return []string{
+				"http://localhost:5173",
+				"http://localhost:3000",
+				"http://localhost:8080",
+				"http://127.0.0.1:5173",
+				"http://127.0.0.1:3000",
+				"http://127.0.0.1:8080",
+			}
+		}
+		// Production - require explicit configuration
+		return []string{}
+	}
+	
+	// Parse comma-separated origins
+	origins := strings.Split(envOrigins, ",")
+	for i, o := range origins {
+		origins[i] = strings.TrimSpace(o)
+	}
+	return origins
+}
 
 func main() {
 	// Database setup
@@ -190,7 +244,20 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 	r.Use(middleware.Logger())
 	r.Use(middleware.Recover())
 	r.Use(middleware.RawPathTraversalGuard())
-	r.Use(middleware.CORS())
+	r.Use(middleware.InputSanitizer())
+	r.Use(middleware.SecurityHeaders())
+	
+	// Rate limiting: configurable via environment variables
+	// Default: 100 requests per minute, can be adjusted with RATE_LIMIT and RATE_LIMIT_WINDOW
+	rateLimit := getIntEnv("RATE_LIMIT", 100)
+	rateLimitWindow := getDurationEnv("RATE_LIMIT_WINDOW", time.Minute)
+	r.Use(middleware.RateLimit(rateLimit, rateLimitWindow))
+	
+	// Request size limit: 10MB for all requests
+	r.Use(middleware.RequestSizeLimit(10 * 1024 * 1024))
+	
+	// Strict CORS (origins from environment, defaults to localhost in dev)
+	r.Use(middleware.StrictCORS(getCORSOrigins()))
 
 	// Health check - public
 	r.GET("/health", func(c *gin.Context) {
@@ -203,13 +270,15 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		// Public auth routes (no middleware)
 		auth := api.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", middleware.AuthRegisterRateLimit(), authHandler.Register)
+			auth.POST("/login", middleware.AuthLoginRateLimit(), authHandler.Login)
+			auth.GET("/csrf-token", middleware.CSRFTokenHandler())
 		}
 
 		// Protected auth routes (auth required)
 		protected := api.Group("/auth")
 		protected.Use(authMiddleware.Authenticate())
+		protected.Use(middleware.CSRF())
 		{
 			protected.POST("/logout", authHandler.Logout)
 			protected.GET("/me", authHandler.Me)
@@ -218,6 +287,7 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		// Protected entries routes (auth required)
 		entries := api.Group("/entries")
 		entries.Use(authMiddleware.Authenticate())
+		entries.Use(middleware.CSRF())
 		{
 			entries.GET("", entryHandler.List)
 			entries.GET("/sources", entryHandler.Sources)
@@ -249,6 +319,7 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		// Protected tags routes (auth required)
 		tags := api.Group("/tags")
 		tags.Use(authMiddleware.Authenticate())
+		tags.Use(middleware.CSRF())
 		{
 			tags.GET("", tagHandler.List)
 			tags.POST("", tagHandler.Create)
@@ -259,6 +330,7 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 
 		archive := api.Group("/archive")
 		archive.Use(authMiddleware.Authenticate())
+		archive.Use(middleware.CSRF())
 		{
 			archive.GET("/metrics", archiveOpsHandler.Metrics)
 		}
@@ -266,6 +338,7 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		// Protected files routes (auth required)
 		files := api.Group("/files")
 		files.Use(authMiddleware.Authenticate())
+		files.Use(middleware.CSRF())
 		{
 			// Thumbnail candidates (before thumbUUID group to avoid UUID validation)
 			files.GET("/thumbnails/:entryID/candidates", thumbnailHandler.ListCandidates)

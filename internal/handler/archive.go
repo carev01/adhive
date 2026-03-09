@@ -51,7 +51,7 @@ func (h *ArchiveOpsHandler) ListRevisions(c *gin.Context) {
 	}
 	revs, err := h.revisionRepo.ListByEntryID(c.Request.Context(), entryID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch revisions", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"revisions": revs})
@@ -103,7 +103,7 @@ func (h *ArchiveOpsHandler) Metrics(c *gin.Context) {
 	since := time.Now().Add(-time.Duration(hours) * time.Hour)
 	m, err := h.revisionRepo.Metrics(c.Request.Context(), since)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to fetch metrics", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -157,7 +157,7 @@ func (h *ArchiveOpsHandler) DeleteRevision(c *gin.Context) {
 	// Delete assets from DB
 	if h.assetRepo != nil {
 		if err := h.assetRepo.DeleteByRevisionID(c.Request.Context(), revisionID); err != nil {
-			SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete assets", err))
+			SendError(c, err) // Pass error directly
 			return
 		}
 	}
@@ -171,14 +171,14 @@ func (h *ArchiveOpsHandler) DeleteRevision(c *gin.Context) {
 			absPath = filepath.Clean(absPath)
 		}
 		if err := os.RemoveAll(absPath); err != nil {
-			SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete revision files", err))
+			SendError(c, err) // Pass error directly
 			return
 		}
 	}
 
 	// Delete revision record from DB
 	if err := h.revisionRepo.DeleteByID(c.Request.Context(), revisionID); err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete revision", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 

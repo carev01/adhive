@@ -98,7 +98,7 @@ func (h *InteractionHandler) Upsert(c *gin.Context) {
 	// Upsert interaction
 	interaction, err := h.interactionRepo.Upsert(c.Request.Context(), entryID, userID, &input)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to save interaction", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
@@ -117,7 +117,7 @@ func (h *InteractionHandler) Delete(c *gin.Context) {
 
 	err := h.interactionRepo.Delete(c.Request.Context(), entryID, userID)
 	if err != nil {
-		SendError(c, apperrors.NewInternalError(apperrors.CodeInternal, "failed to delete interaction", err))
+		SendError(c, err) // Pass error directly
 		return
 	}
 
