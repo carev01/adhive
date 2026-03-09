@@ -49,8 +49,8 @@ func TestEntryRepository_SearchQueryBuilding(t *testing.T) {
 			// Test the escaping logic used in Search
 			result := tt.input
 			result = `"` + result + `"`
-			result = result // This would use strings.ReplaceAll in actual implementation
-			
+			// Note: In actual implementation, strings.ReplaceAll would be used for escaping
+
 			_ = result // Verify it compiles
 			t.Logf("Input: %s, Result: %s", tt.input, result)
 		})

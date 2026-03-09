@@ -242,7 +242,7 @@ func (e *BoltExtractor) extractAssets(archivePath, assetsDir string) ([]Manifest
 
 			// Get content
 			content := bucket.Get([]byte("content"))
-			if content == nil || len(content) == 0 {
+			if len(content) == 0 {
 				return nil
 			}
 

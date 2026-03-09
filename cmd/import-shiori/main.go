@@ -32,7 +32,6 @@ var (
 	resume       = flag.Bool("resume", false, "Resume from checkpoint")
 	checkpoint   = flag.String("checkpoint", "./import-checkpoint.json", "Checkpoint file path")
 	dryRun       = flag.Bool("dry-run", false, "Parse SQL only, don't write to DB")
-	verbose      = flag.Bool("verbose", false, "Detailed logging")
 	batchSize    = flag.Int("batch-size", 50, "Entries per DB transaction")
 	dbPath       = flag.String("db", "ad-catalog.db", "Path to AdHive SQLite database")
 )
@@ -108,12 +107,6 @@ func logError(err ImportError) {
 	log.Printf("[ERROR] %s: %s", err.Phase, err.Error)
 }
 
-func logVerbose(format string, args ...interface{}) {
-	if *verbose {
-		log.Printf("[DEBUG] "+format, args...)
-	}
-}
-
 func main() {
 	flag.Parse()
 	
@@ -132,9 +125,6 @@ func main() {
 	logInfo("Starting Shiori import...")
 	logInfo("SQL dump: %s", *sqlPath)
 	logInfo("User ID: %s", *userID)
-
-	// Increase scanner max token size for large HTML content
-	const maxTokenSize = 10 * 1024 * 1024 // 10MB
 
 	// Load checkpoint if resuming
 	if *resume {
@@ -298,7 +288,7 @@ func main() {
 						}
 					}
 
-					entryRepo.Update(context.Background(), entry)
+					_ = entryRepo.Update(context.Background(), entry)
 				}
 				successCount++
 			} else {
@@ -443,10 +433,8 @@ func importSQLData() error {
 					// There's data on the same line
 					valuesBuffer.WriteString(afterValues)
 // 					logVerbose("Found VALUES with data, buffer: %d chars", valuesBuffer.Len())
-				} else {
-					// VALUES is on its own line, will get data on next lines
-// 					logVerbose("VALUES keyword found, waiting for data...")
 				}
+				// Note: VALUES on its own line will get data on next lines
 				inValues = true
 			}
 			continue
@@ -619,7 +607,7 @@ func importSQLData() error {
 		// Update checkpoint periodically
 		if processed%*batchSize == 0 {
 			idMapper.LastEntryID = bm.ID
-			saveCheckpoint()
+			_ = saveCheckpoint()
 			logInfo("Imported %d bookmarks...", stats.BookmarksImported)
 		}
 	}
@@ -809,7 +797,8 @@ func splitSQLValues(s string) ([]string, error) {
 	quoteChar := rune(0)
 	escaped := false
 
-	for i, r := range s {
+	for i := 0; i < len(s); i++ {
+		r := rune(s[i])
 		// Handle escaped characters
 		if escaped {
 			current.WriteRune(r)
@@ -834,7 +823,7 @@ func splitSQLValues(s string) ([]string, error) {
 			// Check for escaped quote (doubled quote like '' or "")
 			if i+1 < len(s) && rune(s[i+1]) == quoteChar {
 				current.WriteRune(r)
-				i++
+				i++ // Skip the next quote
 				continue
 			}
 			inQuote = false
@@ -1090,7 +1079,7 @@ func importFromJSON(jsonPath string) error {
 		// Update checkpoint periodically
 		if processed%*batchSize == 0 {
 			idMapper.LastEntryID = toInt(bm.ID)
-			saveCheckpoint()
+			_ = saveCheckpoint()
 			logInfo("Imported %d bookmarks...", stats.BookmarksImported)
 		}
 	}

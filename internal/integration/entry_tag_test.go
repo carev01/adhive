@@ -105,7 +105,7 @@ func createTestUser(td *TestDatabaseWithEntries, email string) string {
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 		CreatedAt: time.Now(),
 	}
-	td.SessionRepo.Create(session)
+	_ = td.SessionRepo.Create(session)
 
 	return session.ID
 }
@@ -118,7 +118,7 @@ func createTestSession(td *TestDatabaseWithEntries, userID string) string {
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 		CreatedAt: time.Now(),
 	}
-	td.SessionRepo.Create(session)
+	_ = td.SessionRepo.Create(session)
 	return session.ID
 }
 
@@ -131,7 +131,7 @@ func createEntryForUser(td *TestDatabaseWithEntries, userID, url, title string) 
 		Title:         title,
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 	return entry
 }
 
@@ -160,7 +160,7 @@ func TestEntry_Create(t *testing.T) {
 	}
 
 	var resp handler.EntryResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.URL != "https://example.com/test" {
 		t.Errorf("Expected URL https://example.com/test, got %s", resp.URL)
@@ -243,7 +243,7 @@ func TestEntry_Create_DuplicateURL(t *testing.T) {
 	}
 
 	var resp handler.ErrorResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Detail != "This ad is already in your catalog" {
 		t.Errorf("Expected specific error message, got: %s", resp.Detail)
@@ -262,7 +262,7 @@ func TestEntry_Create_SameURL_DifferentUser(t *testing.T) {
 		URL:           "https://example.com/shared",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	td.EntryRepo.Create(context.Background(), entry)
+	_ = td.EntryRepo.Create(context.Background(), entry)
 
 	// Create user 2 and try to add same URL
 	user2Session := createTestUser(td, "user2@example.com")

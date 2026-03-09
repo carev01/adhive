@@ -435,8 +435,3 @@ func regexMatch(pattern, s string) string {
 	}
 	return ""
 }
-
-// bytesReader creates a reader from byte slice
-func bytesReader(data []byte) *bytes.Reader {
-	return bytes.NewReader(data)
-}

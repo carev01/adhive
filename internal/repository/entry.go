@@ -548,8 +548,8 @@ func (r *EntryRepository) FindRandomEntry(ctx context.Context, userID string) (*
 	}
 
 	// Random offset
-	rand.Seed(time.Now().UnixNano())
-	randomOffset := rand.Intn(int(count))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomOffset := rng.Intn(int(count))
 
 	var entry model.CatalogEntry
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
@@ -575,8 +575,8 @@ func (r *EntryRepository) FindRandomTriedEntry(ctx context.Context, userID strin
 	}
 
 	// Random offset
-	rand.Seed(time.Now().UnixNano())
-	randomOffset := rand.Intn(int(count))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomOffset := rng.Intn(int(count))
 
 	var entry model.CatalogEntry
 	err = r.db.WithContext(ctx).Raw(`
@@ -604,8 +604,8 @@ func (r *EntryRepository) FindRandomEntryWithTag(ctx context.Context, userID, ta
 	}
 
 	// Random offset
-	rand.Seed(time.Now().UnixNano())
-	randomOffset := rand.Intn(int(count))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomOffset := rng.Intn(int(count))
 
 	var entry model.CatalogEntry
 	err := r.db.WithContext(ctx).Raw(`
@@ -634,8 +634,8 @@ func (r *EntryRepository) FindRandomTriedEntryWithTag(ctx context.Context, userI
 	}
 
 	// Random offset
-	rand.Seed(time.Now().UnixNano())
-	randomOffset := rand.Intn(int(count))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomOffset := rng.Intn(int(count))
 
 	var entry model.CatalogEntry
 	err := r.db.WithContext(ctx).Raw(`

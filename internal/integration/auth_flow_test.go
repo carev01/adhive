@@ -29,7 +29,7 @@ func setupIntegrationDB(t *testing.T) *TestDatabase {
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	_ = db.AutoMigrate(&model.User{}, &model.Session{})
 
 	return &TestDatabase{
 		DB:         db,
@@ -135,7 +135,7 @@ func TestFullAuthFlow(t *testing.T) {
 
 	// Verify response contains user data
 	var meResp handler.UserResponse
-	json.Unmarshal(meW.Body.Bytes(), &meResp)
+	_ = json.Unmarshal(meW.Body.Bytes(), &meResp)
 
 	if meResp.Email != "flowtest@example.com" {
 		t.Errorf("Expected email flowtest@example.com, got %s", meResp.Email)
@@ -232,7 +232,7 @@ func TestAuthFlow_ExpiredSession(t *testing.T) {
 		DisplayName:  "Expired Test",
 		IsActive:     true,
 	}
-	td.UserRepo.Create(user)
+	_ = td.UserRepo.Create(user)
 
 	// Create expired session in DB
 	expiredSession := &model.Session{
@@ -240,7 +240,7 @@ func TestAuthFlow_ExpiredSession(t *testing.T) {
 		UserID:    user.ID,
 		ExpiresAt: td.DB.NowFunc().Add(-24), // Expired 24 hours ago
 	}
-	td.SessionRepo.Create(expiredSession)
+	_ = td.SessionRepo.Create(expiredSession)
 
 	// Try to access protected route with expired session
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/protected/me", nil)
@@ -268,7 +268,7 @@ func TestAuthFlow_InactiveUser(t *testing.T) {
 		DisplayName:  "Inactive User",
 		IsActive:     false, // Inactive!
 	}
-	td.UserRepo.Create(inactiveUser)
+	_ = td.UserRepo.Create(inactiveUser)
 
 	// Try to login
 	loginPayload := handler.LoginRequest{
@@ -301,7 +301,7 @@ func TestAuthFlow_EmailConflict(t *testing.T) {
 		PasswordHash: hashedPassword,
 		DisplayName:  "Existing User",
 	}
-	td.UserRepo.Create(existingUser)
+	_ = td.UserRepo.Create(existingUser)
 
 	// Try to register with same email
 	registerPayload := handler.RegisterRequest{

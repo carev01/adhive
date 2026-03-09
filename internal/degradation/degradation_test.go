@@ -356,7 +356,7 @@ func TestCircuitBreaker_Call_OpenCircuit_FastFail(t *testing.T) {
 	cb := NewCircuitBreaker(1, time.Second)
 	
 	// Open the circuit
-	cb.Call(func() error { return errors.New("error") })
+	_ = cb.Call(func() error { return errors.New("error") })
 	
 	if cb.GetState() != CircuitOpen {
 		t.Fatalf("State = %v, want %v", cb.GetState(), CircuitOpen)
@@ -375,7 +375,7 @@ func TestCircuitBreaker_Call_OpenToHalfOpen_Timeout(t *testing.T) {
 	cb := NewCircuitBreaker(1, 50*time.Millisecond)
 	
 	// Open the circuit
-	cb.Call(func() error { return errors.New("error") })
+	_ = cb.Call(func() error { return errors.New("error") })
 	
 	if cb.GetState() != CircuitOpen {
 		t.Fatalf("State = %v, want %v", cb.GetState(), CircuitOpen)
@@ -445,8 +445,8 @@ func TestCircuitBreaker_Reset(t *testing.T) {
 	cb := NewCircuitBreaker(2, time.Second)
 	
 	// Open the circuit
-	cb.Call(func() error { return errors.New("error") })
-	cb.Call(func() error { return errors.New("error") })
+	_ = cb.Call(func() error { return errors.New("error") })
+	_ = cb.Call(func() error { return errors.New("error") })
 	
 	if cb.GetState() != CircuitOpen {
 		t.Fatalf("State = %v, want %v", cb.GetState(), CircuitOpen)

@@ -21,7 +21,7 @@ func setupWorkerTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}
-	db.AutoMigrate(&model.CatalogEntry{})
+	_ = db.AutoMigrate(&model.CatalogEntry{})
 	return db
 }
 
@@ -29,7 +29,7 @@ func setupWorkerTestDB(t *testing.T) *gorm.DB {
 func createMockServer(statusCode int, body string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
-		w.Write([]byte(body))
+		_, _ = w.Write([]byte(body))
 	}))
 }
 
@@ -293,7 +293,7 @@ func TestMarkFailed(t *testing.T) {
 	}
 	
 	// Save entry first
-	entryRepo.Create(context.Background(), entry)
+	_ = entryRepo.Create(context.Background(), entry)
 	
 	worker.markFailed(context.Background(), entry, "test error")
 	
@@ -334,7 +334,7 @@ func TestProcessJob_Success(t *testing.T) {
 		URL:           server.URL,
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	entryRepo.Create(context.Background(), entry)
+	_ = entryRepo.Create(context.Background(), entry)
 	
 	worker.processJob(context.Background(), "test-process")
 	
@@ -360,7 +360,7 @@ func TestProcessJob_FetchError(t *testing.T) {
 		URL:           "https://invalid-domain-that-does-not-exist-12345.com/",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	entryRepo.Create(context.Background(), entry)
+	_ = entryRepo.Create(context.Background(), entry)
 	
 	// This will fail due to invalid URL, but shouldn't panic
 	// Using a context with timeout to prevent long waits
@@ -384,7 +384,7 @@ func TestProcessJob_HttpError(t *testing.T) {
 		URL:           server.URL,
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	entryRepo.Create(context.Background(), entry)
+	_ = entryRepo.Create(context.Background(), entry)
 	
 	worker.processJob(context.Background(), "test-500")
 	
@@ -400,7 +400,8 @@ func TestStartStop(t *testing.T) {
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
 	
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	
 	// Start worker
 	worker.Start(ctx)
@@ -438,7 +439,7 @@ func TestPollPendingEntries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test db: %v", err)
 	}
-	db.AutoMigrate(&model.CatalogEntry{})
+	_ = db.AutoMigrate(&model.CatalogEntry{})
 	
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, tempDir)
@@ -451,7 +452,7 @@ func TestPollPendingEntries(t *testing.T) {
 			URL:           server.URL,
 			ArchiveStatus: model.ArchiveStatusPending,
 		}
-		entryRepo.Create(context.Background(), entry)
+		_ = entryRepo.Create(context.Background(), entry)
 	}
 	
 	// Create already processed entry
@@ -462,7 +463,7 @@ func TestPollPendingEntries(t *testing.T) {
 		ArchiveStatus: model.ArchiveStatusSuccess,
 		ArchivePath:   "/some/path",
 	}
-	entryRepo.Create(context.Background(), processed)
+	_ = entryRepo.Create(context.Background(), processed)
 	
 	// Poll for pending
 	worker.queuePendingEntries(context.Background())

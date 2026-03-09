@@ -147,54 +147,6 @@ func (e *MetadataExtractor) extractEmail(html string, m *Metadata) {
 	}
 }
 
-// cleanText removes extra whitespace and newlines from extracted text
-func cleanText(text string) string {
-	text = strings.ReplaceAll(text, "\n", " ")
-	text = strings.ReplaceAll(text, "\r", " ")
-	text = strings.ReplaceAll(text, "\t", " ")
-	// Replace multiple spaces with single space
-	for strings.Contains(text, "  ") {
-		text = strings.ReplaceAll(text, "  ", " ")
-	}
-	return strings.TrimSpace(text)
-}
-
-func (e *MetadataExtractor) extractLocation(doc *goquery.Document, html string, m *Metadata) {
-	// Try address itemprop
-	location := doc.Find("[itemprop='address']").First().Text()
-	if location = cleanText(location); location != "" {
-		m.Location = location
-		return
-	}
-
-	// Try location class patterns
-	locationSelectors := []string{
-		".location",
-		".address",
-		"[class*='location']",
-		"[class*='address']",
-	}
-
-	for _, sel := range locationSelectors {
-		location = doc.Find(sel).First().Text()
-		if location = cleanText(location); location != "" {
-			m.Location = location
-			return
-		}
-	}
-
-	// Try meta area
-	area := doc.Find("meta[name='geo.placename']").First().AttrOr("content", "")
-	if area != "" {
-		region := doc.Find("meta[name='geo.region']").First().AttrOr("content", "")
-		if region != "" {
-			m.Location = cleanText(area + ", " + region)
-		} else {
-			m.Location = cleanText(area)
-		}
-	}
-}
-
 func (e *MetadataExtractor) extractImages(doc *goquery.Document, pageURL string, m *Metadata) {
 	var images []string
 
