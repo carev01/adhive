@@ -398,7 +398,13 @@
         <!-- Thumbnail -->
         <div class="aspect-video bg-slate-100 dark:bg-slate-700 flex items-center justify-center relative group">
           {#if entry.thumbnail_path}
-            <img src="{entry.thumbnail_path}?t={entry.updated_at}" alt={entry.title} class="max-h-full max-w-full object-contain" />
+            <img 
+              src="{entry.thumbnail_path}?t={entry.updated_at}" 
+              alt={entry.title} 
+              loading="lazy" 
+              decoding="async"
+              class="max-h-full max-w-full object-contain" 
+            />
           {:else}
             <svg class="h-24 w-24 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -444,7 +450,7 @@
                     disabled={selectingCandidateId === candidate.id}
                     class={`flex-shrink-0 w-24 border rounded-md overflow-hidden hover:border-blue-500 ${candidate.selected ? 'border-blue-600 ring-2 ring-blue-200 dark:ring-blue-800' : 'border-slate-200 dark:border-slate-600'}`}
                   >
-                    <img src={getCandidateImageUrl(candidate.path)} alt="Thumbnail candidate" class="w-full h-16 object-cover" />
+                    <img src={getCandidateImageUrl(candidate.path)} alt="Thumbnail candidate" loading="lazy" decoding="async" class="w-full h-16 object-cover" />
                     <div class="px-1 py-0.5 text-[10px] bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-400 flex items-center justify-between">
                       <span class="truncate">{candidate.source_type}</span>
                       {#if candidate.selected}
@@ -624,8 +630,8 @@
                     </label>
 
                     <div>
-                      <label class="block text-sm text-slate-600 dark:text-slate-400 mb-1">Score (1-5)</label>
-                      <div class="flex gap-1">
+                      <span id="score-label" class="block text-sm text-slate-600 dark:text-slate-400 mb-1">Score (1-5)</span>
+                      <div role="group" aria-labelledby="score-label" class="flex gap-1">
                         {#each [1, 2, 3, 4, 5] as score}
                           <button
                             type="button"
@@ -639,8 +645,9 @@
                     </div>
 
                     <div>
-                      <label class="block text-sm text-slate-600 dark:text-slate-400 mb-1">Comments</label>
+                      <label for="interaction-comments" class="block text-sm text-slate-600 dark:text-slate-400 mb-1">Comments</label>
                       <textarea
+                        id="interaction-comments"
                         bind:value={interactionForm.comments}
                         rows="2"
                         class="w-full border border-slate-300 dark:border-slate-600 rounded-md p-2 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"

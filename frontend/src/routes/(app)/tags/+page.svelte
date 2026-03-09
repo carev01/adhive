@@ -231,10 +231,10 @@
 
         <!-- Color -->
         <div>
-          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label for="tag-color" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
             Color
           </label>
-          <div class="mt-2 flex flex-wrap gap-2">
+          <div id="tag-color" class="mt-2 flex flex-wrap gap-2">
             {#each colors as c}
               <button
                 type="button"

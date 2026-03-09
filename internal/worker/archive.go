@@ -507,7 +507,7 @@ func (w *ArchiveWorker) PollPendingEntries(ctx context.Context, interval time.Du
 	}
 }
 
-// queuePendingEntries finds and queues pending entries
+// queuePendingEntries finds and queues pending entries (excludes entries that already have successful archives)
 func (w *ArchiveWorker) queuePendingEntries(ctx context.Context) {
 	entries, err := w.entryRepo.FindPendingForArchiving(ctx, 50)
 	if err != nil {
@@ -516,6 +516,11 @@ func (w *ArchiveWorker) queuePendingEntries(ctx context.Context) {
 	}
 
 	for _, entry := range entries {
+		// Skip entries that already have successful archives (prevent duplicate revisions)
+		if entry.ArchiveStatus == model.ArchiveStatusSuccess && entry.ArchivePath != "" {
+			continue
+		}
+		
 		if entry.ArchiveStatus == model.ArchiveStatusPending && entry.ArchivePath == "" {
 			// Skip if already being processed in this worker instance
 			if _, inProc := w.processing[entry.ID]; inProc {

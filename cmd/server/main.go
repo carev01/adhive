@@ -12,10 +12,12 @@ import (
 	"github.com/carev01/adhive/internal/config"
 	"github.com/carev01/adhive/internal/handler"
 	"github.com/carev01/adhive/internal/middleware"
+	"github.com/carev01/adhive/internal/migrations"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/carev01/adhive/internal/service"
 	"github.com/carev01/adhive/internal/worker"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -32,6 +34,11 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	// Configure SQLite for optimal performance
+	if err := configureSQLite(db); err != nil {
+		log.Printf("Warning: Failed to configure SQLite PRAGMAs: %v", err)
+	}
+
 	// Auto-migrate tables
 	err = db.AutoMigrate(
 		&model.User{},
@@ -46,6 +53,19 @@ func main() {
 	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	// Run database migrations (indexes, FTS, etc.)
+	if err := migrations.V1CreateIndexes(db); err != nil {
+		log.Printf("Warning: Failed to run index migrations: %v", err)
+	}
+
+	// Create FTS5 for full-text search
+	if err := migrations.V2CreateFTS5(db); err != nil {
+		log.Printf("Warning: Failed to create FTS5: %v", err)
+	} else {
+		// Repopulate FTS from existing data
+		migrations.RepopulateFTS5(db)
 	}
 
 	// Repositories
@@ -131,9 +151,40 @@ func main() {
 	}
 }
 
+// configureSQLite sets up SQLite performance PRAGMAs
+func configureSQLite(db *gorm.DB) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
+	pragmas := []string{
+		"PRAGMA journal_mode=WAL;",
+		"PRAGMA synchronous=NORMAL;",
+		"PRAGMA cache_size=-64000;", // 64MB
+		"PRAGMA busy_timeout=5000;",
+		"PRAGMA foreign_keys=ON;",
+		"PRAGMA temp_store=MEMORY;",
+		"PRAGMA mmap_size=268435456;", // 256MB
+	}
+
+	for _, pragma := range pragmas {
+		if _, err := sqlDB.Exec(pragma); err != nil {
+			log.Printf("Warning: Failed to set PRAGMA %s: %v", pragma, err)
+		} else {
+			log.Printf("SQLite PRAGMA applied: %s", pragma)
+		}
+	}
+
+	return nil
+}
+
 // setupRouter configures all routes
 func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHandler, tagHandler *handler.TagHandler, interactionHandler *handler.InteractionHandler, archiveOpsHandler *handler.ArchiveOpsHandler, authMiddleware *middleware.AuthMiddleware, fileHandler *handler.FileHandler, thumbnailHandler *handler.ThumbnailHandler) *gin.Engine {
 	r := gin.Default()
+
+	// Enable gzip compression for responses > 1KB
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	// Global middleware
 	r.Use(middleware.Logger())

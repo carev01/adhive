@@ -3,7 +3,10 @@ package repository
 import (
 	"context"
 	"errors"
+	"log"
+	"math/rand"
 	"sort"
+	"time"
 
 	"github.com/carev01/adhive/internal/model"
 
@@ -117,16 +120,129 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 	}, nil
 }
 
-// Search performs full-text search on entries
+// Search performs full-text search on entries using FTS5 for better performance
 func (r *EntryRepository) Search(ctx context.Context, userID, query string, filter *model.EntryFilter) (*model.EntryListResult, error) {
+	// First try FTS5 search
+	result, err := r.searchWithFTS5(ctx, userID, query, filter)
+	
+	// If FTS5 fails or returns no results, fall back to LIKE search
+	if err != nil || (result != nil && result.Total == 0) {
+		log.Printf("FTS5 search failed or returned no results (%v), falling back to LIKE search", err)
+		return r.searchWithLike(ctx, userID, query, filter)
+	}
+	
+	return result, nil
+}
+
+// searchWithFTS5 performs full-text search using FTS5
+func (r *EntryRepository) searchWithFTS5(ctx context.Context, userID, query string, filter *model.EntryFilter) (*model.EntryListResult, error) {
+	// Use FTS5 for full-text search (much faster than LIKE)
+	// First find matching rowids from FTS, then join with catalog_entries
+	ftsQuery := r.db.WithContext(ctx).
+		Table("entries_fts fts").
+		Select("catalog_entries.*").
+		Joins("JOIN catalog_entries ON catalog_entries.rowid = fts.rowid").
+		Where("catalog_entries.user_id = ?", userID).
+		Where("entries_fts MATCH ?", query+"*")
+
+	// Apply additional filters
+	if filter.ExcludeTried {
+		ftsQuery = ftsQuery.Where("catalog_entries.id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
+	}
+
+	// Date range filter
+	if filter.DateFrom != "" {
+		ftsQuery = ftsQuery.Where("catalog_entries.created_at >= ?", filter.DateFrom)
+	}
+	if filter.DateTo != "" {
+		ftsQuery = ftsQuery.Where("catalog_entries.created_at <= ?", filter.DateTo+" 23:59:59")
+	}
+
+	// Source/domain filter
+	if filter.Source != "" {
+		ftsQuery = ftsQuery.Where("catalog_entries.url LIKE ?", "%"+filter.Source+"%")
+	}
+
+	// Location filter
+	if filter.Location != "" {
+		ftsQuery = ftsQuery.Where("catalog_entries.location LIKE ?", "%"+filter.Location+"%")
+	}
+
+	// HasInteraction filter
+	if filter.HasInteraction {
+		ftsQuery = ftsQuery.Where("catalog_entries.id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
+	}
+
+	// MinScore filter
+	if filter.MinScore > 0 {
+		ftsQuery = ftsQuery.Where("catalog_entries.id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
+	}
+
+	// Determine sort order
+	sortField := "catalog_entries.created_at"
+	sortDir := "DESC"
+	switch filter.SortBy {
+	case "title":
+		sortField = "catalog_entries.title"
+	case "updated_at":
+		sortField = "catalog_entries.updated_at"
+	}
+	if filter.SortOrder == "asc" {
+		sortDir = "ASC"
+	}
+
+	// Count total matching entries
+	var total int64
+	ftsQuery.Count(&total)
+
+	// Apply pagination and get entry IDs first
+	offset := (filter.Page - 1) * filter.Limit
+	var entryIDs []string
+	err := r.db.WithContext(ctx).
+		Table("entries_fts fts").
+		Select("catalog_entries.id").
+		Joins("JOIN catalog_entries ON catalog_entries.rowid = fts.rowid").
+		Where("catalog_entries.user_id = ?", userID).
+		Where("entries_fts MATCH ?", query+"*").
+		Order(sortField + " " + sortDir).
+		Offset(offset).
+		Limit(filter.Limit).
+		Pluck("id", &entryIDs).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Now fetch the full entries (tags are fetched separately by handler)
+	var entries []*model.CatalogEntry
+	if len(entryIDs) > 0 {
+		err = r.db.WithContext(ctx).
+			Where("id IN ?", entryIDs).
+			Order(sortField + " " + sortDir).
+			Find(&entries).Error
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &model.EntryListResult{
+		Entries: entries,
+		Total:   total,
+		Page:    filter.Page,
+		Limit:   filter.Limit,
+	}, nil
+}
+
+// searchWithLike performs fallback search using LIKE
+func (r *EntryRepository) searchWithLike(ctx context.Context, userID, query string, filter *model.EntryFilter) (*model.EntryListResult, error) {
 	searchPattern := "%" + query + "%"
 
-	// Build base query
+	// Build base query with LIKE
 	baseQuery := r.db.WithContext(ctx).Where("user_id = ?", userID).
 		Where("LOWER(title) LIKE ? OR LOWER(description) LIKE ? OR LOWER(phone_number) LIKE ? OR LOWER(location) LIKE ? OR LOWER(url) LIKE ?",
 			searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
 
-	// Apply ExcludeTried filter in SQL if requested
+	// Apply ExcludeTried filter
 	if filter.ExcludeTried {
 		baseQuery = baseQuery.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
 	}
@@ -149,17 +265,17 @@ func (r *EntryRepository) Search(ctx context.Context, userID, query string, filt
 		baseQuery = baseQuery.Where("location LIKE ?", "%"+filter.Location+"%")
 	}
 
-	// HasInteraction filter - only entries with interactions
+	// HasInteraction filter
 	if filter.HasInteraction {
 		baseQuery = baseQuery.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
 	}
 
-	// MinScore filter - entries where user's score >= minScore (implies HasInteraction)
+	// MinScore filter
 	if filter.MinScore > 0 {
 		baseQuery = baseQuery.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
 	}
 
-	// Determine sort order
+	// Sort
 	sortField := "created_at"
 	sortDir := "DESC"
 	switch filter.SortBy {
@@ -172,14 +288,15 @@ func (r *EntryRepository) Search(ctx context.Context, userID, query string, filt
 		sortDir = "ASC"
 	}
 
-	// Count total matching entries
+	// Count total
 	var total int64
 	baseQuery.Model(&model.CatalogEntry{}).Count(&total)
 
 	// Apply pagination
 	offset := (filter.Page - 1) * filter.Limit
 	var entries []*model.CatalogEntry
-	err := baseQuery.Order(sortField + " " + sortDir).
+	err := baseQuery.
+		Order(sortField + " " + sortDir).
 		Offset(offset).
 		Limit(filter.Limit).
 		Find(&entries).Error
@@ -239,17 +356,89 @@ func (r *EntryRepository) Delete(ctx context.Context, id, userID string) error {
 	})
 }
 
-// GetByUserIDWithTags finds all entries for a user with their tags
+// GetByUserIDWithTags finds all entries for a user with their tags (fixes N+1 query)
 func (r *EntryRepository) GetByUserIDWithTags(ctx context.Context, userID string, filter *model.EntryFilter) (*model.EntryListResult, error) {
-	result, err := r.GetByUserID(ctx, userID, filter)
+	// Build query with preloaded tags
+	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+
+	// Apply filters
+	if filter.TagID != "" {
+		query = query.Joins("JOIN entry_tags ON catalog_entries.id = entry_tags.entry_id").
+			Where("entry_tags.tag_id = ?", filter.TagID)
+	}
+
+	if filter.Status != "" {
+		query = query.Where("archive_status = ?", filter.Status)
+	}
+
+	if filter.ExcludeTried {
+		query = query.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
+	}
+
+	// HasInteraction filter
+	if filter.HasInteraction {
+		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
+	}
+
+	// MinScore filter
+	if filter.MinScore > 0 {
+		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
+	}
+
+	// Date range filtering
+	if filter.DateFrom != "" {
+		query = query.Where("created_at >= ?", filter.DateFrom)
+	}
+	if filter.DateTo != "" {
+		query = query.Where("created_at <= ?", filter.DateTo)
+	}
+
+	// Source/domain filtering
+	if filter.Source != "" {
+		query = query.Where("url LIKE ?", "%"+filter.Source+"%")
+	}
+
+	// Location filter
+	if filter.Location != "" {
+		query = query.Where("location LIKE ?", "%"+filter.Location+"%")
+	}
+
+	// Count total
+	var total int64
+	query.Model(&model.CatalogEntry{}).Count(&total)
+
+	// Build dynamic ORDER BY clause
+	sortField := "created_at"
+	sortDir := "DESC"
+	if filter.SortBy != "" {
+		switch filter.SortBy {
+		case "title", "updated_at":
+			sortField = filter.SortBy
+		}
+	}
+	if filter.SortOrder != "" && (filter.SortOrder == "asc" || filter.SortOrder == "ASC") {
+		sortDir = "ASC"
+	}
+	orderClause := sortField + " " + sortDir
+
+	// Apply pagination (tags fetched separately by handler)
+	offset := (filter.Page - 1) * filter.Limit
+	var entries []*model.CatalogEntry
+	err := query.
+		Order(orderClause).
+		Offset(offset).
+		Limit(filter.Limit).
+		Find(&entries).Error
 	if err != nil {
 		return nil, err
 	}
 
-	// Fetch tags for all entries (placeholder - extend model if needed)
-	_ = r.db
-
-	return result, nil
+	return &model.EntryListResult{
+		Entries: entries,
+		Total:   total,
+		Page:    filter.Page,
+		Limit:   filter.Limit,
+	}, nil
 }
 
 // AddTag adds a tag to an entry
@@ -336,54 +525,121 @@ func (r *EntryRepository) BulkDelete(ctx context.Context, userID string, entryID
 	})
 }
 
-// FindRandomEntry finds a random entry for a user
+// FindRandomEntry finds a random entry for a user using count + offset (O(1) vs O(n log n))
 func (r *EntryRepository) FindRandomEntry(ctx context.Context, userID string) (*model.CatalogEntry, error) {
+	// Get total count for this user
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.CatalogEntry{}).
+		Where("user_id = ?", userID).Count(&count).Error; err != nil {
+		return nil, err
+	}
+
+	if count == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	// Random offset
+	rand.Seed(time.Now().UnixNano())
+	randomOffset := rand.Intn(int(count))
+
 	var entry model.CatalogEntry
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
-		Order("RANDOM()").
-		Take(&entry).Error
+		Offset(randomOffset).
+		First(&entry).Error
+
 	return &entry, err
 }
 
-// FindRandomTriedEntry finds a random entry that hasn't been tried yet
+// FindRandomTriedEntry finds a random entry that hasn't been tried yet using count + offset
 func (r *EntryRepository) FindRandomTriedEntry(ctx context.Context, userID string) (*model.CatalogEntry, error) {
+	// Get count of untried entries
+	var count int64
+	err := r.db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM catalog_entries ce
+		LEFT JOIN interactions i ON ce.id = i.entry_id AND i.user_id = ?
+		WHERE ce.user_id = ? AND (i.id IS NULL OR i.tried = 0)`, userID, userID).Scan(&count).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if count == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	// Random offset
+	rand.Seed(time.Now().UnixNano())
+	randomOffset := rand.Intn(int(count))
+
 	var entry model.CatalogEntry
-	err := r.db.WithContext(ctx).Table("catalog_entries").
-		Select("catalog_entries.*").
-		Joins("LEFT JOIN interactions ON catalog_entries.id = interactions.entry_id AND interactions.user_id = ?", userID).
-		Where("catalog_entries.user_id = ?", userID).
-		Where("interactions.id IS NULL OR interactions.tried = ?", false).
-		Order("RANDOM()").
-		Take(&entry).Error
-	return &entry, err
+	err = r.db.WithContext(ctx).Raw(`
+		SELECT ce.* FROM catalog_entries ce
+		LEFT JOIN interactions i ON ce.id = i.entry_id AND i.user_id = ?
+		WHERE ce.user_id = ? AND (i.id IS NULL OR i.tried = 0)
+		LIMIT 1 OFFSET ?`, userID, userID, randomOffset).
+		Scan(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
 }
 
-// FindRandomEntryWithTag finds a random entry with a specific tag
+// FindRandomEntryWithTag finds a random entry with a specific tag using count + offset
 func (r *EntryRepository) FindRandomEntryWithTag(ctx context.Context, userID, tagID string) (*model.CatalogEntry, error) {
+	// Get count of entries with this tag using raw SQL for reliability
+	var count int64
+	r.db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM catalog_entries ce
+		JOIN entry_tags et ON ce.id = et.entry_id
+		WHERE ce.user_id = ? AND et.tag_id = ?`, userID, tagID).Scan(&count)
+
+	if count == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	// Random offset
+	rand.Seed(time.Now().UnixNano())
+	randomOffset := rand.Intn(int(count))
+
 	var entry model.CatalogEntry
-	err := r.db.WithContext(ctx).Table("catalog_entries").
-		Select("catalog_entries.*").
-		Joins("JOIN entry_tags ON catalog_entries.id = entry_tags.entry_id").
-		Where("catalog_entries.user_id = ?", userID).
-		Where("entry_tags.tag_id = ?", tagID).
-		Order("RANDOM()").
-		Take(&entry).Error
-	return &entry, err
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT ce.* FROM catalog_entries ce
+		JOIN entry_tags et ON ce.id = et.entry_id
+		WHERE ce.user_id = ? AND et.tag_id = ?
+		LIMIT 1 OFFSET ?`, userID, tagID, randomOffset).
+		Scan(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
 }
 
-// FindRandomTriedEntryWithTag finds a random entry with a specific tag that hasn't been tried
+// FindRandomTriedEntryWithTag finds a random entry with a specific tag that hasn't been tried using count + offset
 func (r *EntryRepository) FindRandomTriedEntryWithTag(ctx context.Context, userID, tagID string) (*model.CatalogEntry, error) {
+	// Get count of untried entries with this tag using raw SQL for reliability
+	var count int64
+	r.db.WithContext(ctx).Raw(`SELECT COUNT(*) FROM catalog_entries ce
+		JOIN entry_tags et ON ce.id = et.entry_id
+		LEFT JOIN interactions i ON ce.id = i.entry_id AND i.user_id = ?
+		WHERE ce.user_id = ? AND et.tag_id = ? AND (i.id IS NULL OR i.tried = 0)`, userID, userID, tagID).Scan(&count)
+
+	if count == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	// Random offset
+	rand.Seed(time.Now().UnixNano())
+	randomOffset := rand.Intn(int(count))
+
 	var entry model.CatalogEntry
-	err := r.db.WithContext(ctx).Table("catalog_entries").
-		Select("catalog_entries.*").
-		Joins("JOIN entry_tags ON catalog_entries.id = entry_tags.entry_id").
-		Joins("LEFT JOIN interactions ON catalog_entries.id = interactions.entry_id AND interactions.user_id = ?", userID).
-		Where("catalog_entries.user_id = ?", userID).
-		Where("entry_tags.tag_id = ?", tagID).
-		Where("interactions.id IS NULL OR interactions.tried = ?", false).
-		Order("RANDOM()").
-		Take(&entry).Error
-	return &entry, err
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT ce.* FROM catalog_entries ce
+		JOIN entry_tags et ON ce.id = et.entry_id
+		LEFT JOIN interactions i ON ce.id = i.entry_id AND i.user_id = ?
+		WHERE ce.user_id = ? AND et.tag_id = ? AND (i.id IS NULL OR i.tried = 0)
+		LIMIT 1 OFFSET ?`, userID, userID, tagID, randomOffset).
+		Scan(&entry).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
 }
 
 // FindByURL finds an entry by URL for a specific user
@@ -403,12 +659,13 @@ func (r *EntryRepository) CountByUserID(ctx context.Context, userID string) (int
 	return count, err
 }
 
-// FindPendingForArchiving finds entries pending archival
+// FindPendingForArchiving finds entries pending archival (excludes imported entries)
 func (r *EntryRepository) FindPendingForArchiving(ctx context.Context, limit int) ([]*model.CatalogEntry, error) {
 	var entries []*model.CatalogEntry
 	err := r.db.WithContext(ctx).
 		Where("archive_status = ?", model.ArchiveStatusPending).
 		Or("archive_status = ? AND archive_path = ?", model.ArchiveStatusFailed, "").
+		Where("(imported_from IS NULL OR imported_from = '')").
 		Limit(limit).
 		Find(&entries).Error
 	return entries, err

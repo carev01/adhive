@@ -683,7 +683,13 @@
           <!-- Thumbnail -->
           <div class="aspect-video bg-slate-100 dark:bg-slate-700 rounded-md mb-3 flex items-center justify-center overflow-hidden">
             {#if entry.thumbnail_path}
-              <img src="{entry.thumbnail_path}?t={entry.updated_at}" alt={entry.title} class="w-full h-full object-cover" />
+              <img 
+                src="{entry.thumbnail_path}?t={entry.updated_at}" 
+                alt={entry.title} 
+                loading="lazy" 
+                decoding="async"
+                class="w-full h-full object-cover" 
+              />
             {:else}
               <svg class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -768,7 +774,9 @@
 
 <!-- Tag Modal -->
 {#if showTagModal}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" on:click={closeModals}>
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" on:click={closeModals} role="dialog" aria-modal="true" aria-labelledby="tag-modal-title">
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4" on:click|stopPropagation>
       <h2 class="text-lg font-medium text-slate-900 dark:text-white mb-4">Bulk Tag</h2>
       <div class="mb-4">
@@ -797,7 +805,9 @@
 
 <!-- Delete Confirmation Modal -->
 {#if showDeleteModal}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" on:click={closeModals}>
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" on:click={closeModals} role="alertdialog" aria-modal="true" aria-labelledby="delete-modal-title">
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4" on:click|stopPropagation>
       <h2 class="text-lg font-medium text-slate-900 dark:text-white mb-4">Delete {selectedEntries.size} Entries?</h2>
       <p class="text-slate-600 dark:text-slate-400 mb-4">This action cannot be undone.</p>
