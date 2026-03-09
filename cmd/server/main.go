@@ -78,11 +78,8 @@ func getCORSOrigins() []string {
 }
 
 func main() {
-	// Database setup
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "ad-catalog.db"
-	}
+	// Database setup - uses unified DATA_DIR or DB_PATH (backwards compatible)
+	dbPath := config.GetDBPath()
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)

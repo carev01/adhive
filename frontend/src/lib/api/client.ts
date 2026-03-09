@@ -3,8 +3,11 @@ import { goto } from '$app/navigation';
 import { page } from '$app/stores';
 import { getCSRFToken, clearCSRFToken } from './csrf';
 
-// Base API URL - would typically come from env
-export const API_BASE = '/api/v1';
+// Base API URL - from environment variable or default to /api/v1 (relative)
+// In dev: use proxy (/api/v1)
+// In prod: use VITE_API_URL or relative path
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+export { API_BASE };
 
 // Helper to handle API responses and auto-redirect on 401
 async function handleApiResponse(response: Response): Promise<Response> {

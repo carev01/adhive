@@ -1,4 +1,5 @@
-const API_BASE = '/api/v1';
+// API Base URL - from environment variable or default to /api/v1 (relative)
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 export interface LoginRequest {
 	email: string;

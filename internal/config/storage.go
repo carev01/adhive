@@ -11,20 +11,59 @@ type StorageConfig struct {
 	BaseDir     string
 	ArchivesDir string
 	ThumbDir    string
+	DataDir     string // New unified data directory
+	DBPath      string // Database path
 }
 
 // DefaultStorageConfig returns default storage configuration
+// Supports unified DATA_DIR or individual DB_PATH/STORAGE_DIR for backwards compatibility
 func DefaultStorageConfig() *StorageConfig {
-	baseDir := os.Getenv("STORAGE_DIR")
-	if baseDir == "" {
-		baseDir = "./data"
+	// Check for unified DATA_DIR first
+	dataDir := os.Getenv("DATA_DIR")
+	
+	var baseDir, dbPath string
+	
+	if dataDir != "" {
+		// Use unified DATA_DIR
+		baseDir = dataDir
+		dbPath = filepath.Join(dataDir, "adhive.db")
+	} else {
+		// Fall back to individual paths for backwards compatibility
+		baseDir = os.Getenv("STORAGE_DIR")
+		if baseDir == "" {
+			baseDir = "./data"
+		}
+		
+		dbPath = os.Getenv("DB_PATH")
+		if dbPath == "" {
+			dbPath = "ad-catalog.db"
+		}
 	}
 	
 	return &StorageConfig{
 		BaseDir:     baseDir,
 		ArchivesDir: filepath.Join(baseDir, "archives"),
 		ThumbDir:    filepath.Join(baseDir, "thumbnails"),
+		DataDir:     dataDir,
+		DBPath:      dbPath,
 	}
+}
+
+// GetDBPath returns the database path
+// Supports DATA_DIR (unified) or DB_PATH (backwards compatible)
+func GetDBPath() string {
+	// Check for unified DATA_DIR first
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir != "" {
+		return filepath.Join(dataDir, "adhive.db")
+	}
+	
+	// Fall back to DB_PATH
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "ad-catalog.db"
+	}
+	return dbPath
 }
 
 // EnsureDirectories creates storage directories if they don't exist

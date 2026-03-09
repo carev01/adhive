@@ -1,0 +1,41 @@
+[Unit]
+Description=AdHive - Classified Ads Catalog
+Documentation=https://docs.adhive.ai
+After=network.target
+
+[Service]
+Type=notify
+User=adhive
+Group=adhive
+WorkingDirectory=/opt/adhive
+
+# Environment
+Environment=PORT=8080
+Environment=DATA_DIR=/var/lib/adhive/data
+Environment=GO_ENV=production
+Environment=LOG_LEVEL=info
+EnvironmentFile=/etc/adhive/config.env
+
+# Binary
+ExecStart=/opt/adhive/bin/ad-catalog
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/adhive/data
+ReadOnlyPaths=/etc/adhive
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=512M
+CPUQuota=1
+
+[Install]
+WantedBy=multi-user.target
