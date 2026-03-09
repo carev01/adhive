@@ -152,6 +152,13 @@ func (w *ArchiveWorker) consumeManualCaptureRequest(entryID string) bool {
 	return manual
 }
 
+// QueueJobs queues multiple entries for archive refresh
+func (w *ArchiveWorker) QueueJobs(entryIDs []string) {
+	for _, entryID := range entryIDs {
+		w.QueueJob(entryID)
+	}
+}
+
 // run is the main worker loop
 func (w *ArchiveWorker) run(ctx context.Context) {
 	for {

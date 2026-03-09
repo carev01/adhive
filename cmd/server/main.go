@@ -170,6 +170,10 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		{
 			entries.GET("", entryHandler.List)
 			entries.GET("/sources", entryHandler.Sources)
+			entries.GET("/locations", entryHandler.Locations)
+			entries.POST("/bulk/tag", entryHandler.BulkTag)
+			entries.POST("/bulk/delete", entryHandler.BulkDelete)
+			entries.POST("/bulk/archive", entryHandler.BulkArchive)
 			entries.POST("", entryHandler.Create)
 			entries.POST("/random", entryHandler.Random)
 			entries.GET("/:id", entryHandler.Get)

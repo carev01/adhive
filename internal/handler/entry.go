@@ -24,6 +24,7 @@ type EntryHandler struct {
 	storageConfig  *config.StorageConfig
 	archiveWorker  interface {
 		QueueJob(entryID string)
+		QueueJobs(entryIDs []string)
 	}
 }
 
@@ -45,7 +46,7 @@ func NewEntryHandlerWithStorage(entryRepo *repository.EntryRepository, tagRepo *
 }
 
 // SetArchiveWorker sets the archive worker for auto-archiving
-func (h *EntryHandler) SetArchiveWorker(w interface{ QueueJob(entryID string) }) {
+func (h *EntryHandler) SetArchiveWorker(w interface{ QueueJob(entryID string); QueueJobs(entryIDs []string) }) {
 	h.archiveWorker = w
 }
 
@@ -151,6 +152,7 @@ func (h *EntryHandler) List(c *gin.Context) {
 	dateFrom := c.Query("date_from")
 	dateTo := c.Query("date_to")
 	source := c.Query("source")
+	location := c.Query("location")
 	sortBy := c.DefaultQuery("sort_by", "created_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	hasInteraction := c.Query("has_interaction") == "true"
@@ -172,6 +174,7 @@ func (h *EntryHandler) List(c *gin.Context) {
 		DateFrom:        dateFrom,
 		DateTo:          dateTo,
 		Source:          source,
+		Location:        location,
 		SortBy:          sortBy,
 		SortOrder:       sortOrder,
 		HasInteraction:  hasInteraction,
@@ -246,6 +249,159 @@ func (h *EntryHandler) Sources(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, map[string][]string{"sources": sources})
+}
+
+// Locations handles GET /api/v1/entries/locations
+func (h *EntryHandler) Locations(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	locations, err := h.entryRepo.GetUserLocations(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Internal Server Error",
+			Status: http.StatusInternalServerError,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, map[string][]string{"locations": locations})
+}
+
+// BulkTagRequest represents a bulk tag operation request
+type BulkTagRequest struct {
+	EntryIDs []string `json:"entry_ids" binding:"required"`
+	TagIDs   []string `json:"tag_ids" binding:"required"`
+	Action   string   `json:"action" binding:"required,oneof=add remove"`
+}
+
+// BulkTag handles POST /api/v1/entries/bulk/tag
+func (h *EntryHandler) BulkTag(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	var req BulkTagRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Bad Request",
+			Status: http.StatusBadRequest,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	var err error
+	if req.Action == "add" {
+		err = h.entryRepo.BulkAddTags(c.Request.Context(), req.EntryIDs, req.TagIDs)
+	} else {
+		err = h.entryRepo.BulkRemoveTags(c.Request.Context(), req.EntryIDs, req.TagIDs)
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Internal Server Error",
+			Status: http.StatusInternalServerError,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "action": req.Action, "count": len(req.EntryIDs)})
+}
+
+// BulkDeleteRequest represents a bulk delete request
+type BulkDeleteRequest struct {
+	EntryIDs []string `json:"entry_ids" binding:"required"`
+}
+
+// BulkDelete handles POST /api/v1/entries/bulk/delete
+func (h *EntryHandler) BulkDelete(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	var req BulkDeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Bad Request",
+			Status: http.StatusBadRequest,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	err := h.entryRepo.BulkDelete(c.Request.Context(), userID, req.EntryIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Internal Server Error",
+			Status: http.StatusInternalServerError,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "deleted": len(req.EntryIDs)})
+}
+
+// BulkArchive handles POST /api/v1/entries/bulk/archive
+func (h *EntryHandler) BulkArchive(c *gin.Context) {
+	userID := c.GetString("user_id")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Unauthorized",
+			Status: http.StatusUnauthorized,
+			Detail: "user not authenticated",
+		})
+		return
+	}
+
+	var req BulkDeleteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Type:   "about:blank",
+			Title:  "Bad Request",
+			Status: http.StatusBadRequest,
+			Detail: err.Error(),
+		})
+		return
+	}
+
+	// Queue all entries for archive refresh
+	if h.archiveWorker != nil {
+		h.archiveWorker.QueueJobs(req.EntryIDs)
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"queued": len(req.EntryIDs)})
 }
 
 // Create handles POST /api/v1/entries

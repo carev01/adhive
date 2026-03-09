@@ -34,4 +34,8 @@
 	}
 </script>
 
+<svelte:head>
+	<title>AdHive - Ad Catalog</title>
+</svelte:head>
+
 <slot />

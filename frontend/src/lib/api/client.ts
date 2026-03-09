@@ -81,6 +81,7 @@ export async function fetchEntries(params: {
   date_from?: string;
   date_to?: string;
   source?: string;
+  location?: string;
   sort_by?: 'created_at' | 'updated_at' | 'title';
   sort_order?: 'asc' | 'desc';
   has_interaction?: boolean;
@@ -96,6 +97,7 @@ export async function fetchEntries(params: {
   if (params.date_from) searchParams.set('date_from', params.date_from);
   if (params.date_to) searchParams.set('date_to', params.date_to);
   if (params.source) searchParams.set('source', params.source);
+  if (params.location) searchParams.set('location', params.location);
   if (params.sort_by) searchParams.set('sort_by', params.sort_by);
   if (params.sort_order) searchParams.set('sort_order', params.sort_order);
   if (params.has_interaction) searchParams.set('has_interaction', params.has_interaction.toString());
@@ -130,6 +132,71 @@ export async function fetchSources(): Promise<string[]> {
 
   const data = await response.json();
   return data.sources || [];
+}
+
+export async function fetchLocations(): Promise<string[]> {
+  const response = await fetch(`${API_BASE}/entries/locations`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch locations: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.locations || [];
+}
+
+// Bulk operations
+export async function bulkTagEntries(entryIds: string[], tagIds: string[], action: 'add' | 'remove'): Promise<void> {
+  const response = await fetch(`${API_BASE}/entries/bulk/tag`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    credentials: 'include',
+    body: JSON.stringify({ entry_ids: entryIds, tag_ids: tagIds, action }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to ${action} tags: ${response.statusText}`);
+  }
+}
+
+export async function bulkDeleteEntries(entryIds: string[]): Promise<void> {
+  const response = await fetch(`${API_BASE}/entries/bulk/delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    credentials: 'include',
+    body: JSON.stringify({ entry_ids: entryIds }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete entries: ${response.statusText}`);
+  }
+}
+
+export async function bulkArchiveEntries(entryIds: string[]): Promise<void> {
+  const response = await fetch(`${API_BASE}/entries/bulk/archive`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    credentials: 'include',
+    body: JSON.stringify({ entry_ids: entryIds }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to archive entries: ${response.statusText}`);
+  }
 }
 
 export async function fetchEntry(id: string): Promise<Entry> {

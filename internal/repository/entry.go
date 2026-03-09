@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"sort"
 
 	"github.com/carev01/adhive/internal/model"
 
@@ -74,6 +76,11 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 		query = query.Where("url LIKE ?", "%"+filter.Source+"%")
 	}
 
+	// Location filter
+	if filter.Location != "" {
+		query = query.Where("location LIKE ?", "%"+filter.Location+"%")
+	}
+
 	// Determine sort order
 	sortField := "created_at"
 	sortDir := "DESC"
@@ -135,6 +142,11 @@ func (r *EntryRepository) Search(ctx context.Context, userID, query string, filt
 	// Source/domain filter
 	if filter.Source != "" {
 		baseQuery = baseQuery.Where("url LIKE ?", "%"+filter.Source+"%")
+	}
+
+	// Location filter
+	if filter.Location != "" {
+		baseQuery = baseQuery.Where("location LIKE ?", "%"+filter.Location+"%")
 	}
 
 	// HasInteraction filter - only entries with interactions
@@ -254,6 +266,76 @@ func (r *EntryRepository) RemoveTag(ctx context.Context, entryID, tagID string) 
 	return r.db.WithContext(ctx).Where("entry_id = ? AND tag_id = ?", entryID, tagID).Delete(&model.EntryTag{}).Error
 }
 
+// BulkAddTags adds tags to multiple entries
+func (r *EntryRepository) BulkAddTags(ctx context.Context, entryIDs, tagIDs []string) error {
+	if len(entryIDs) == 0 || len(tagIDs) == 0 {
+		return nil
+	}
+	
+	var entryTags []model.EntryTag
+	for _, entryID := range entryIDs {
+		for _, tagID := range tagIDs {
+			entryTags = append(entryTags, model.EntryTag{
+				EntryID: entryID,
+				TagID:   tagID,
+			})
+		}
+	}
+	
+	return r.db.WithContext(ctx).Create(&entryTags).Error
+}
+
+// BulkRemoveTags removes tags from multiple entries
+func (r *EntryRepository) BulkRemoveTags(ctx context.Context, entryIDs, tagIDs []string) error {
+	if len(entryIDs) == 0 || len(tagIDs) == 0 {
+		return nil
+	}
+	
+	return r.db.WithContext(ctx).
+		Where("entry_id IN ?", entryIDs).
+		Where("tag_id IN ?", tagIDs).
+		Delete(&model.EntryTag{}).Error
+}
+
+// BulkDelete deletes multiple entries
+func (r *EntryRepository) BulkDelete(ctx context.Context, userID string, entryIDs []string) error {
+	if len(entryIDs) == 0 {
+		return nil
+	}
+	
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verify ownership for all entries
+		var count int64
+		if err := tx.Model(&model.CatalogEntry{}).
+			Where("id IN ?", entryIDs).
+			Where("user_id = ?", userID).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		
+		if count != int64(len(entryIDs)) {
+			return errors.New("one or more entries not found or not owned by user")
+		}
+		
+		// Delete entry_tag associations
+		if err := tx.Where("entry_id IN ?", entryIDs).Delete(&model.EntryTag{}).Error; err != nil {
+			return err
+		}
+		
+		// Delete interactions
+		if err := tx.Where("entry_id IN ?", entryIDs).Delete(&model.Interaction{}).Error; err != nil {
+			return err
+		}
+		
+		// Delete entries
+		if err := tx.Where("id IN ?", entryIDs).Delete(&model.CatalogEntry{}).Error; err != nil {
+			return err
+		}
+		
+		return nil
+	})
+}
+
 // FindRandomEntry finds a random entry for a user
 func (r *EntryRepository) FindRandomEntry(ctx context.Context, userID string) (*model.CatalogEntry, error) {
 	var entry model.CatalogEntry
@@ -354,5 +436,33 @@ func (r *EntryRepository) GetUserSources(ctx context.Context, userID string) ([]
 		}
 	}
 
+	return results, nil
+}
+
+// GetUserLocations returns unique locations from user's entries
+func (r *EntryRepository) GetUserLocations(ctx context.Context, userID string) ([]string, error) {
+	var results []string
+	
+	rows, err := r.db.WithContext(ctx).
+		Model(&model.CatalogEntry{}).
+		Select("DISTINCT location").
+		Where("user_id = ?", userID).
+		Where("location IS NOT NULL AND location != ''").
+		Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var location string
+		if err := rows.Scan(&location); err == nil && location != "" {
+			results = append(results, location)
+		}
+	}
+
+	// Sort alphabetically
+	sort.Strings(results)
+	
 	return results, nil
 }

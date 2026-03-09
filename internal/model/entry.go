@@ -65,19 +65,20 @@ type EntryUpdateInput struct {
 
 // EntryFilter represents filter options for querying entries (matches handler expectations)
 type EntryFilter struct {
-	Page          int
-	Limit         int
-	TagID         string
-	Search        string
-	Status        ArchiveStatus
-	ExcludeTried  bool
-	DateFrom      string
-	DateTo        string
-	Source        string
-	SortBy        string
-	SortOrder     string
-	HasInteraction bool // Filter to only entries with interactions
-	MinScore      int   // Minimum score filter (0-5)
+	Page           int
+	Limit          int
+	TagID          string
+	Search         string
+	Status         ArchiveStatus
+	ExcludeTried   bool
+	DateFrom       string
+	DateTo         string
+	Source         string
+	Location       string // Filter by location
+	SortBy         string
+	SortOrder      string
+	HasInteraction bool   // Filter to only entries with interactions
+	MinScore       int    // Minimum score filter (0-5)
 }
 
 type EntryListResult struct {
