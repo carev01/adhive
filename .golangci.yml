@@ -32,12 +32,6 @@ linters-settings:
     
   misspell:
     locale: US
-    
-  unparam:
-    algo: cha
-    
-  unused:
-    check-generated: true
 
 issues:
   exclude-rules:
