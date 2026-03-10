@@ -25,8 +25,8 @@ func SecurityHeaders() gin.HandlerFunc {
 		// Referrer-Policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// Content-Security-Policy
-		c.Header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'")
+		// Content-Security-Policy - allow inline scripts for SvelteKit
+		c.Header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
 
 		c.Next()
 	}
