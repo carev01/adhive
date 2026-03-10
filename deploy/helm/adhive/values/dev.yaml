@@ -1,0 +1,48 @@
+# Development values for adhive
+
+image:
+  tag: dev
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+persistence:
+  enabled: true
+  storageClass: "standard"
+  database:
+    size: 500Mi
+  archives:
+    size: 1Gi
+  thumbnails:
+    size: 500Mi
+
+env:
+  GO_ENV: "development"
+  LOG_LEVEL: "debug"
+  DEBUG: "true"
+  # Development defaults
+  CSRF_ENABLED: "false"
+  CSRF_SECURE: "false"
+  CSRF_SAME_SITE: "Lax"
+  # CORS for local development
+  CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:3000,http://localhost:8080"
+
+secret:
+  enabled: false
+
+autoscaling:
+  enabled: false

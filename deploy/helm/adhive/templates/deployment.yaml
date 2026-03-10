@@ -1,0 +1,194 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "adhive.fullname" . }}
+  labels:
+    {{- include "adhive.labels" . | nindent 4 }}
+  {{- with .Values.pod.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "adhive.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.pod.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "adhive.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "adhive.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.pod.securityContext | nindent 8 }}
+      {{- if .Values.persistence.enabled }}
+      initContainers:
+      - name: init-permissions
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            mkdir -p {{ .Values.persistence.database.mountPath }} \
+                     {{ .Values.persistence.archives.mountPath }} \
+                     {{ .Values.persistence.thumbnails.mountPath }} \
+                     /app/logs
+            chown -R 1000:1000 {{ .Values.persistence.database.mountPath }} \
+                                 {{ .Values.persistence.archives.mountPath }} \
+                                 {{ .Values.persistence.thumbnails.mountPath }} \
+                                 /app/logs
+        volumeMounts:
+        {{- if .Values.persistence.database.enabled }}
+        - name: database
+          mountPath: {{ .Values.persistence.database.mountPath }}
+        {{- end }}
+        {{- if .Values.persistence.archives.enabled }}
+        - name: archives
+          mountPath: {{ .Values.persistence.archives.mountPath }}
+        {{- end }}
+        {{- if .Values.persistence.thumbnails.enabled }}
+        - name: thumbnails
+          mountPath: {{ .Values.persistence.thumbnails.mountPath }}
+        {{- end }}
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+      {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+          protocol: TCP
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.resources }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        {{- end }}
+        securityContext:
+          {{- toYaml .Values.containerSecurityContext | nindent 10 }}
+        env:
+        - name: PORT
+          value: {{ .Values.env.PORT | quote }}
+        - name: DATA_DIR
+          value: {{ .Values.env.DATA_DIR }}
+        - name: GO_ENV
+          value: {{ .Values.env.GO_ENV }}
+        - name: LOG_LEVEL
+          value: {{ .Values.env.LOG_LEVEL }}
+        - name: HTTPS_ENABLED
+          value: {{ .Values.env.HTTPS_ENABLED }}
+        - name: CORS_ALLOWED_ORIGINS
+          value: {{ .Values.env.CORS_ALLOWED_ORIGINS }}
+        - name: RATE_LIMIT_GLOBAL
+          value: {{ .Values.env.RATE_LIMIT_GLOBAL | quote }}
+        - name: RATE_LIMIT_AUTH
+          value: {{ .Values.env.RATE_LIMIT_AUTH | quote }}
+        - name: CSRF_ENABLED
+          value: {{ .Values.env.CSRF_ENABLED }}
+        - name: CSRF_SECURE
+          value: {{ .Values.env.CSRF_SECURE }}
+        - name: CSRF_SAME_SITE
+          value: {{ .Values.env.CSRF_SAME_SITE }}
+        - name: DEBUG
+          value: {{ .Values.env.DEBUG }}
+        {{- if .Values.env.USER_AGENT }}
+        - name: USER_AGENT
+          value: {{ .Values.env.USER_AGENT }}
+        {{- end }}
+        {{- if .Values.env.HUMAN_DOMAINS }}
+        - name: HUMAN_DOMAINS
+          value: {{ .Values.env.HUMAN_DOMAINS }}
+        {{- end }}
+        {{- if .Values.secret.enabled }}
+        - name: SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "adhive.fullname" . }}-secret
+              key: SESSION_SECRET
+              optional: false
+        {{- else }}
+        - name: SESSION_SECRET
+          value: {{ .Values.env.SESSION_SECRET }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.persistence.enabled }}
+        {{- if .Values.persistence.database.enabled }}
+        - name: database
+          mountPath: {{ .Values.persistence.database.mountPath }}
+        {{- end }}
+        {{- if .Values.persistence.archives.enabled }}
+        - name: archives
+          mountPath: {{ .Values.persistence.archives.mountPath }}
+        {{- end }}
+        {{- if .Values.persistence.thumbnails.enabled }}
+        - name: thumbnails
+          mountPath: {{ .Values.persistence.thumbnails.mountPath }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.configMap.enabled }}
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        {{- end }}
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+      volumes:
+      {{- if .Values.persistence.enabled }}
+      {{- if .Values.persistence.database.enabled }}
+      - name: database
+        persistentVolumeClaim:
+          claimName: {{ include "adhive.databasePVC" . }}
+      {{- end }}
+      {{- if .Values.persistence.archives.enabled }}
+      - name: archives
+        persistentVolumeClaim:
+          claimName: {{ include "adhive.archivesPVC" . }}
+      {{- end }}
+      {{- if .Values.persistence.thumbnails.enabled }}
+      - name: thumbnails
+        persistentVolumeClaim:
+          claimName: {{ include "adhive.thumbnailsPVC" . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.configMap.enabled }}
+      - name: config
+        configMap:
+          name: {{ include "adhive.fullname" . }}-config
+      {{- end }}
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

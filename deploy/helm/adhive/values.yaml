@@ -1,0 +1,212 @@
+# Default values for adhive.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## Global settings
+global:
+  nameOverride: ""
+  fullnameOverride: ""
+
+## Image configuration
+image:
+  repository: ghcr.io/adhive/adhive
+  tag: latest
+  pullPolicy: IfNotPresent
+
+## Image pull secrets (optional)
+imagePullSecrets: []
+# - name: regcred
+
+## Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+## Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+    # cloud.google.com/load-balancer-type: "External"
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+
+## Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+  hosts:
+    - host: adhive.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: adhive-tls
+  #   hosts:
+  #     - adhive.local
+
+## Resources configuration
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+## Liveness and readiness probes
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+## Pod configuration
+pod:
+  annotations: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+## Container security context
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+
+## Persistence configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+
+  # Database PVC
+  database:
+    enabled: true
+    size: 1Gi
+    mountPath: /app/data
+
+  # Archives PVC
+  archives:
+    enabled: true
+    size: 10Gi
+    mountPath: /app/data/archives
+
+  # Thumbnails PVC
+  thumbnails:
+    enabled: true
+    size: 5Gi
+    mountPath: /app/data/thumbnails
+
+## Environment variables
+env:
+  # Required in production
+  SESSION_SECRET: ""
+  
+  # Server
+  PORT: "8080"
+  GO_ENV: "production"
+  LOG_LEVEL: "info"
+  
+  # Data directory (unified storage)
+  DATA_DIR: "/app/data"
+  
+  # Legacy paths (backwards compatible, derived from DATA_DIR if not set)
+  # DB_PATH: ""
+  # STORAGE_DIR: ""
+  
+  # Security
+  HTTPS_ENABLED: "false"
+  CORS_ALLOWED_ORIGINS: ""
+  
+  # Rate Limiting
+  RATE_LIMIT_GLOBAL: "100"
+  RATE_LIMIT_AUTH: "5"
+  
+  # CSRF Protection
+  CSRF_ENABLED: "true"
+  CSRF_SECURE: "true"
+  CSRF_SAME_SITE: "Strict"
+  
+  # Playwright Scraper
+  USER_AGENT: ""
+  HUMAN_DOMAINS: ""
+  
+  # Debug mode
+  DEBUG: "false"
+
+## ConfigMap configuration (non-sensitive)
+configMap:
+  enabled: true
+  data: {}
+    # Additional non-sensitive config can be added here
+    # LOG_FORMAT: "json"
+
+## Secret configuration (sensitive)
+secret:
+  enabled: true
+  data: {}
+    # SESSION_SECRET: "changeme"
+    # Additional secrets can be added here
+
+## Horizontal Pod Autoscaler
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+## PodDisruptionBudget
+pdb:
+  enabled: false
+  minAvailable: 1
+
+## NetworkPolicy
+networkPolicy:
+  enabled: false
+
+## Node selector
+nodeSelector: {}
+
+## Tolerations
+tolerations: []
+
+## Affinity
+affinity: {}
+
+## Service monitor for Prometheus
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  namespace: monitoring
+
+## Priority class
+priorityClassName: ""

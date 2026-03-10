@@ -1,0 +1,18 @@
+apiVersion: v2
+name: adhive
+description: AdHive - Classified Ads Catalog for self-hosting
+home: https://github.com/adhive/adhive
+sources:
+  - https://github.com/adhive/adhive
+keywords:
+  - classified-ads
+  - catalog
+  - self-hosted
+maintainers:
+  - name: AdHive Team
+    url: https://github.com/adhive/adhive
+engine: gotpl
+version: 0.1.0
+appVersion: "latest"
+kubeVersion: ">=1.21.0"
+dependencies: []

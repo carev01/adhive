@@ -1,0 +1,102 @@
+# Production values for adhive
+
+image:
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    - host: adhive.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: adhive-tls
+      hosts:
+        - adhive.yourdomain.com
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  initialDelaySeconds: 60
+
+readinessProbe:
+  initialDelaySeconds: 15
+
+persistence:
+  enabled: true
+  storageClass: "fast-storage"  # Use your cluster's fast storageclass
+  database:
+    size: 5Gi
+  archives:
+    size: 50Gi
+  thumbnails:
+    size: 10Gi
+
+env:
+  GO_ENV: "production"
+  LOG_LEVEL: "info"
+  HTTPS_ENABLED: "true"
+  # Rate limiting
+  RATE_LIMIT_GLOBAL: "200"
+  RATE_LIMIT_AUTH: "10"
+  # CSRF protection
+  CSRF_ENABLED: "true"
+  CSRF_SECURE: "true"
+  CSRF_SAME_SITE: "Strict"
+  # Must be set via --set or values override
+  # CORS_ALLOWED_ORIGINS: "https://yourdomain.com"
+  # Optional: Custom user agent for scraper
+  # USER_AGENT: "AdHive/1.0"
+  # Optional: Domains requiring manual intervention
+  # HUMAN_DOMAINS: "captcha-heavy-site.com"
+
+secret:
+  enabled: true
+  data:
+    # SESSION_SECRET must be set via --set or values override
+    # Generate with: openssl rand -hex 32
+    SESSION_SECRET: ""
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+networkPolicy:
+  enabled: true
+
+pod:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: "OnRootMismatch"
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
