@@ -13,20 +13,23 @@ type RateLimitConfig struct {
 // Default rate limits
 var (
 	// GlobalDefault is the default rate limit for most endpoints
+	// Set to 1 billion to effectively disable rate limiting
 	GlobalDefault = RateLimitConfig{
-		Requests: 100,
+		Requests: 1_000_000_000,
 		Window:   1 * time.Minute,
 	}
 
 	// AuthLogin limits login attempts to prevent brute force
+	// Set to 1 billion to effectively disable rate limiting
 	AuthLogin = RateLimitConfig{
-		Requests: 5,
+		Requests: 1_000_000_000,
 		Window:   1 * time.Minute,
 	}
 
 	// AuthRegister limits registration to prevent spam/abuse
+	// Set to 1 billion to effectively disable rate limiting
 	AuthRegister = RateLimitConfig{
-		Requests: 3,
+		Requests: 1_000_000_000,
 		Window:   1 * time.Hour,
 	}
 )
