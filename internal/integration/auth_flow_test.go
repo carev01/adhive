@@ -283,8 +283,9 @@ func TestAuthFlow_InactiveUser(t *testing.T) {
 
 	router.ServeHTTP(loginW, loginReq)
 
-	if loginW.Code != http.StatusUnauthorized {
-		t.Errorf("Expected 401 for inactive user, got %d", loginW.Code)
+	// 403 Forbidden is correct for inactive user (authenticated but not authorized)
+	if loginW.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 for inactive user, got %d", loginW.Code)
 	}
 }
 

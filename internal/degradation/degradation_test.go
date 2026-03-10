@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -467,32 +468,32 @@ func TestCircuitBreaker_ConcurrentAccess(t *testing.T) {
 	cb := NewCircuitBreaker(10, time.Second)
 
 	var wg sync.WaitGroup
-	successCount := 0
-	errorCount := 0
+	var successCount atomic.Int32
+	var errorCount atomic.Int32
 
 	// Simulate concurrent calls
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go func() {
+		go func(idx int) {
 			defer wg.Done()
 			err := cb.Call(func() error {
-				if i%2 == 0 {
+				if idx%2 == 0 {
 					return nil
 				}
 				return errors.New("error")
 			})
 			if err == nil {
-				successCount++
+				successCount.Add(1)
 			} else {
-				errorCount++
+				errorCount.Add(1)
 			}
-		}()
+		}(i)
 	}
 
 	wg.Wait()
 
 	// Just verify no race conditions - actual counts may vary
-	t.Logf("Success: %d, Errors: %d", successCount, errorCount)
+	t.Logf("Success: %d, Errors: %d", successCount.Load(), errorCount.Load())
 }
 
 func TestErrCircuitOpen(t *testing.T) {
