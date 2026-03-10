@@ -263,10 +263,10 @@ func (s *PlaywrightService) IsAvailable() bool {
 		return false
 	}
 
-	// Check for Chromium binary - either system or bundled
+	// Check for Chromium binary - system Chromium or bundled Playwright
 	chromiumPaths := []string{
-		"/usr/bin/chromium-browser", // Alpine system Chromium
-		"/usr/bin/chromium",         // Alternative system Chromium
+		"/usr/bin/chromium-browser", // System Chromium (Alpine)
+		"/usr/bin/chromium",         // System Chromium (Debian/Ubuntu)
 	}
 
 	// Also check env var for custom path

@@ -57,9 +57,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # =============================================================================
 # Stage 3: Playwright browser installation
 # =============================================================================
-FROM node:24-alpine AS playwright-builder
+# Use Debian-slim for Playwright (glibc required for bundled Chromium)
+FROM node:24-slim AS playwright-builder
 
 WORKDIR /app
+
+# Install Playwright system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Playwright dependencies for Chromium
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+    libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files for Playwright
 COPY package.json package-lock.json* ./
@@ -68,54 +77,35 @@ COPY playwright-scraper.js ./
 # Install Node.js dependencies (Playwright + adblocker + autoconsent)
 RUN npm ci --omit=dev
 
-# Install Playwright browsers (Chromium only) - Alpine's system chromium
-# We'll use Alpine's chromium package in the runtime image instead
+# Install Playwright browsers (Chromium only, native glibc support)
 RUN npx playwright install chromium
 
 # =============================================================================
 # Stage 4: Final runtime image
 # =============================================================================
-FROM node:24-alpine
+# Use Debian-slim for Playwright compatibility (glibc-based)
+FROM node:24-slim
 
-# Install runtime dependencies for Chromium
-# Alpine's chromium package pulls in most dependencies automatically
-RUN apk add --no-cache \
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    tzdata \
     dumb-init \
-    # Chromium and its dependencies
-    chromium \
-    # Additional fonts
-    font-noto-cjk \
-    font-noto-emoji \
-    # Required for Playwright's bundled Chromium (glibc compatibility)
-    libstdc++ \
-    libgcc \
-    # X11 libs that may not be pulled in automatically
-    libx11 \
-    libxcb \
-    libxcomposite \
-    libxdamage \
-    libxrandr \
-    libxfixes \
-    libxkbcommon \
-    mesa-gl \
-    # Audio support
-    alsa-lib \
-    # DBus for browser communication
-    dbus-libs
+    # Playwright dependencies for Chromium
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+    libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 \
+    # Fonts for web rendering
+    fonts-noto-cjk fonts-noto-color-emoji \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user and group
-# Use UID 1001 to avoid conflict with base image's user
-RUN addgroup -g 1001 -S adhive && \
-    adduser -u 1001 -S -G adhive -s /bin/sh adhive
+RUN groupadd -g 1001 adhive && \
+    useradd -u 1001 -g adhive -m -s /bin/bash adhive
 
 # Create required directories with proper ownership
-# Playwright needs a cache directory and tmp for profile data
 RUN mkdir -p /app/static /app/data /app/logs /app/backups \
     /home/adhive/.cache \
-    /tmp/playwright \
-    && chown -R adhive:adhive /app /home/adhive /tmp/playwright
+    && chown -R adhive:adhive /app /home/adhive
 
 WORKDIR /app
 
@@ -132,9 +122,6 @@ COPY --from=playwright-builder --chown=adhive:adhive /app/node_modules /app/node
 COPY --from=playwright-builder --chown=adhive:adhive /app/playwright-scraper.js /app/playwright-scraper.js
 COPY --from=playwright-builder --chown=adhive:adhive /app/package.json /app/package.json
 
-# Playwright is installed but we'll use Alpine's system Chromium
-# The system chromium is installed by the apk package in the runtime stage
-
 # Switch to non-root user
 USER adhive
 
@@ -143,8 +130,6 @@ ENV PORT=8080 \
     DATA_DIR=/app/data \
     GO_ENV=production \
     LOG_LEVEL=info \
-    # Playwright configuration - use Alpine's system Chromium
-    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
     HOME=/app \
     # Chromium flags for containerized environment
     CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox"

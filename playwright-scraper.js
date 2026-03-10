@@ -947,7 +947,9 @@ async function scrape(config) {
 }
 
 async function _scrapeAttempt(config, attemptNumber) {
-  // Use system Chromium on Alpine (from PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH env or config)
+  // Playwright uses bundled Chromium by default on Debian-based images.
+  // The executablePath config is kept for backward compatibility with Alpine
+  // deployments that need to use system Chromium (PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH).
   const executablePath = config.executablePath || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || null;
   
   const launchOptions = {
