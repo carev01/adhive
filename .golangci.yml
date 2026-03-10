@@ -19,7 +19,7 @@ linters:
     - unconvert
     - unparam
   disable:
-    - typecheck
+#   - typecheck
     - errcheck
     
 linters-settings:
