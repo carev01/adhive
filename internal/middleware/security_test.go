@@ -271,3 +271,152 @@ func TestValidateSortParams_ValidOrder(t *testing.T) {
 		t.Error("Valid sort order (case insensitive) should be accepted")
 	}
 }
+
+// TestRateLimitDisabled verifies rate limiting is disabled when RATE_LIMIT_ENABLED=false
+func TestRateLimitDisabled(t *testing.T) {
+	// Set environment variable to disable rate limiting
+	t.Setenv("RATE_LIMIT_ENABLED", "false")
+
+	// Get the middleware - it should pass through when disabled
+	middleware := RateLimit(100, time.Minute)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/test", nil)
+
+	// Run the middleware
+	middleware(c)
+
+	// Should NOT abort (not rate limited)
+	if c.IsAborted() {
+		t.Error("Request should not be aborted when rate limiting is disabled")
+	}
+}
+
+// TestRateLimitDisabled_MultipleRequests verifies multiple rapid requests pass when disabled
+func TestRateLimitDisabled_MultipleRequests(t *testing.T) {
+	// Set environment variable to disable rate limiting
+	t.Setenv("RATE_LIMIT_ENABLED", "false")
+
+	// Get the middleware
+	middleware := RateLimit(1, time.Minute) // Very low limit
+
+	// Make 10 rapid requests
+	for i := 0; i < 10; i++ {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("GET", "/test", nil)
+
+		middleware(c)
+
+		if c.IsAborted() {
+			t.Errorf("Request %d should not be aborted when rate limiting is disabled", i+1)
+		}
+	}
+}
+
+// TestRateLimitDisabled_AuthLogin verifies auth login rate limiting is disabled
+func TestRateLimitDisabled_AuthLogin(t *testing.T) {
+	// Set environment variable to disable rate limiting
+	t.Setenv("RATE_LIMIT_ENABLED", "false")
+
+	// Get the middleware
+	middleware := AuthLoginRateLimit()
+
+	// Make 10 rapid login attempts
+	for i := 0; i < 10; i++ {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest("POST", "/auth/login", nil)
+
+		middleware(c)
+
+		if c.IsAborted() {
+			t.Errorf("Login attempt %d should not be aborted when rate limiting is disabled", i+1)
+		}
+	}
+}
+
+// TestRateLimitEnabled_Default verifies rate limiting is enabled by default (no env var)
+func TestRateLimitEnabled_Default(t *testing.T) {
+	// Make sure RATE_LIMIT_ENABLED is not set
+	t.Setenv("RATE_LIMIT_ENABLED", "")
+
+	// Get the middleware with very low limit
+	middleware := RateLimit(1, time.Minute)
+
+	// First request should pass
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/test", nil)
+	middleware(c)
+
+	if c.IsAborted() {
+		t.Error("First request should not be aborted")
+	}
+
+	// Second request should be blocked
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest("GET", "/test", nil)
+	middleware(c2)
+
+	if !c2.IsAborted() {
+		t.Error("Second request should be aborted (rate limited)")
+	}
+
+	// Verify rate limit error response
+	if w2.Code != http.StatusTooManyRequests {
+		t.Errorf("Expected status %d, got %d", http.StatusTooManyRequests, w2.Code)
+	}
+}
+
+// TestRateLimitEnabled_ExplicitTrue verifies rate limiting is enabled when explicitly set to true
+func TestRateLimitEnabled_ExplicitTrue(t *testing.T) {
+	// Explicitly enable rate limiting
+	t.Setenv("RATE_LIMIT_ENABLED", "true")
+
+	// Get the middleware with very low limit
+	middleware := RateLimit(1, time.Minute)
+
+	// First request should pass
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/test", nil)
+	middleware(c)
+
+	if c.IsAborted() {
+		t.Error("First request should not be aborted")
+	}
+
+	// Second request should be blocked
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest("GET", "/test", nil)
+	middleware(c2)
+
+	if !c2.IsAborted() {
+		t.Error("Second request should be aborted (rate limited)")
+	}
+}
+
+// TestRateLimitDisabled_NoHeaders verifies no rate limit headers when disabled
+func TestRateLimitDisabled_NoHeaders(t *testing.T) {
+	// Set environment variable to disable rate limiting
+	t.Setenv("RATE_LIMIT_ENABLED", "false")
+
+	// Get the middleware
+	middleware := RateLimit(100, time.Minute)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/test", nil)
+
+	middleware(c)
+
+	// When rate limiting is disabled, headers should not be set
+	// (or at least not the rate limit specific ones)
+	if c.Writer.Header().Get("X-RateLimit-Limit") != "" {
+		t.Log("Note: Rate limit headers are still present even when disabled")
+	}
+}

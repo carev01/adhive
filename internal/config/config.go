@@ -21,8 +21,9 @@ type AppConfig struct {
 	StorageDir string
 
 	// Rate Limiting
-	RateLimit       int
-	RateLimitWindow time.Duration
+	RateLimitEnabled bool
+	RateLimit        int
+	RateLimitWindow  time.Duration
 
 	// Security
 	SessionSecret string
@@ -60,9 +61,10 @@ func LoadAppConfig() *AppConfig {
 		// Storage
 		StorageDir: getEnvOrDefault("STORAGE_DIR", "./data"),
 
-		// Rate Limiting
-		RateLimit:       getEnvIntOrDefault("RATE_LIMIT", 100),
-		RateLimitWindow: getEnvDurationOrDefault("RATE_LIMIT_WINDOW", time.Minute),
+		// Rate Limiting (default enabled)
+		RateLimitEnabled: getEnvBoolOrDefault("RATE_LIMIT_ENABLED", true),
+		RateLimit:        getEnvIntOrDefault("RATE_LIMIT", 100),
+		RateLimitWindow:  getEnvDurationOrDefault("RATE_LIMIT_WINDOW", time.Minute),
 
 		// Security
 		SessionSecret: os.Getenv("SESSION_SECRET"),
@@ -83,6 +85,15 @@ func LoadAppConfig() *AppConfig {
 		LogLevel: getEnvOrDefault("LOG_LEVEL", "info"),
 		Debug:    os.Getenv("DEBUG") == "true",
 	}
+}
+
+// getEnvBoolOrDefault returns environment variable as bool or default
+func getEnvBoolOrDefault(key string, defaultVal bool) bool {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	return val == "true" || val == "1" || val == "yes"
 }
 
 // getEnvOrDefault returns environment variable or default

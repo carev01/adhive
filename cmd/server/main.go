@@ -57,6 +57,15 @@ func getIntEnv(key string, defaultVal int) int {
 	return defaultVal
 }
 
+// getBoolEnv returns a boolean from environment or default
+func getBoolEnv(key string, defaultVal bool) bool {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	return val == "true" || val == "1" || val == "yes"
+}
+
 // getDurationEnv returns a duration from environment or default
 func getDurationEnv(key string, defaultVal time.Duration) time.Duration {
 	if val := os.Getenv(key); val != "" {
@@ -269,10 +278,14 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 	r.Use(middleware.SecurityHeaders())
 
 	// Rate limiting: configurable via environment variables
-	// Default: 100 requests per minute, can be adjusted with RATE_LIMIT and RATE_LIMIT_WINDOW
-	rateLimit := getIntEnv("RATE_LIMIT", 100)
-	rateLimitWindow := getDurationEnv("RATE_LIMIT_WINDOW", time.Minute)
-	r.Use(middleware.RateLimit(rateLimit, rateLimitWindow))
+	// Default: enabled, 100 requests per minute
+	// Can be disabled with RATE_LIMIT_ENABLED=false
+	rateLimitEnabled := getBoolEnv("RATE_LIMIT_ENABLED", true)
+	if rateLimitEnabled {
+		rateLimit := getIntEnv("RATE_LIMIT", 100)
+		rateLimitWindow := getDurationEnv("RATE_LIMIT_WINDOW", time.Minute)
+		r.Use(middleware.RateLimit(rateLimit, rateLimitWindow))
+	}
 
 	// Request size limit: 10MB for all requests
 	r.Use(middleware.RequestSizeLimit(10 * 1024 * 1024))

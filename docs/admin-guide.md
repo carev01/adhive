@@ -170,6 +170,7 @@ sudo journalctl -u adhive -f
 | `SESSION_SECRET` | Yes (prod) | - | Secret for session cookies |
 | `HTTPS_ENABLED` | No | `false` | Enable HTTPS mode |
 | `CORS_ALLOWED_ORIGINS` | No | - | Comma-separated CORS origins |
+| `RATE_LIMIT_ENABLED` | No | `true` | Enable/disable rate limiting |
 | `RATE_LIMIT_GLOBAL` | No | `100` | Global rate limit (per minute) |
 | `RATE_LIMIT_AUTH` | No | `5` | Auth endpoint rate limit |
 
@@ -221,15 +222,25 @@ You'll need to configure a reverse proxy (nginx, Caddy, or Traefik) for TLS term
 
 ### Rate Limiting
 
-Rate limiting is built-in:
+Rate limiting is built-in and enabled by default:
 
 - **Global**: Default 100 requests/minute per IP
 - **Auth**: Default 5 requests/minute for login/register endpoints
 
-Adjust in environment:
+To disable rate limiting (not recommended for production):
 
 ```yaml
 environment:
+  - RATE_LIMIT_ENABLED=false
+```
+
+> **Note**: Only disable rate limiting for single-user deployments where all traffic is trusted (e.g., behind a trusted reverse proxy or on a private network).
+
+Adjust limits in environment:
+
+```yaml
+environment:
+  - RATE_LIMIT_ENABLED=true
   - RATE_LIMIT_GLOBAL=100
   - RATE_LIMIT_AUTH=5
 ```

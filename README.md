@@ -162,6 +162,7 @@ sudo systemctl stop adhive
 | `SESSION_SECRET` | Yes (prod) | - | Session signing secret |
 | `HTTPS_ENABLED` | No | `false` | Enable HTTPS mode |
 | `CORS_ALLOWED_ORIGINS` | No | (dev defaults) | CORS origins |
+| `RATE_LIMIT_ENABLED` | No | `true` | Enable rate limiting |
 | `RATE_LIMIT_GLOBAL` | No | `100` | Global rate limit/min |
 | `RATE_LIMIT_AUTH` | No | `5` | Auth rate limit/min |
 

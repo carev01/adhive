@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -9,6 +10,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// rateLimitEnabled checks if rate limiting is enabled via environment variable
+// Default is true (enabled) for security
+func rateLimitEnabled() bool {
+	val := os.Getenv("RATE_LIMIT_ENABLED")
+	if val == "" {
+		return true // Default to enabled
+	}
+	return val != "false" && val != "0" && val != "no"
+}
 
 // SecurityHeaders adds security response headers
 func SecurityHeaders() gin.HandlerFunc {
@@ -191,7 +202,15 @@ func (rl *RateLimiter) isAllowed(key string) bool {
 }
 
 // RateLimit returns a rate limiting middleware
+// When RATE_LIMIT_ENABLED is set to false, all requests pass through without rate limiting
 func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
+	// If rate limiting is disabled, return a pass-through middleware
+	if !rateLimitEnabled() {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
 	limiter := NewRateLimiter(limit, window)
 
 	return func(c *gin.Context) {
@@ -332,7 +351,15 @@ func ValidateSortParams(allowedColumns []string) gin.HandlerFunc {
 }
 
 // AuthLoginRateLimit limits login attempts to prevent brute force (5 per minute)
+// When RATE_LIMIT_ENABLED is set to false, all requests pass through without rate limiting
 func AuthLoginRateLimit() gin.HandlerFunc {
+	// If rate limiting is disabled, return a pass-through middleware
+	if !rateLimitEnabled() {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 
@@ -351,7 +378,15 @@ func AuthLoginRateLimit() gin.HandlerFunc {
 }
 
 // AuthRegisterRateLimit limits registration to prevent spam/abuse (3 per hour)
+// When RATE_LIMIT_ENABLED is set to false, all requests pass through without rate limiting
 func AuthRegisterRateLimit() gin.HandlerFunc {
+	// If rate limiting is disabled, return a pass-through middleware
+	if !rateLimitEnabled() {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 

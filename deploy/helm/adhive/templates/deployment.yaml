@@ -79,6 +79,8 @@ spec:
           value: {{ .Values.env.HTTPS_ENABLED | quote }}
         - name: CORS_ALLOWED_ORIGINS
           value: {{ .Values.env.CORS_ALLOWED_ORIGINS | quote }}
+        - name: RATE_LIMIT_ENABLED
+          value: {{ .Values.env.RATE_LIMIT_ENABLED | quote }}
         - name: RATE_LIMIT_GLOBAL
           value: {{ .Values.env.RATE_LIMIT_GLOBAL | quote }}
         - name: RATE_LIMIT_AUTH

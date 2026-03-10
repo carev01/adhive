@@ -133,6 +133,7 @@ ENV PORT=8080 \
     DATA_DIR=/app/data \
     GO_ENV=production \
     LOG_LEVEL=info \
+    RATE_LIMIT_ENABLED=true \
     HOME=/app \
     # Playwright and Chromium configuration
     PLAYWRIGHT_BROWSERS_PATH=/home/adhive/.cache/ms-playwright \
