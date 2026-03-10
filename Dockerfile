@@ -32,7 +32,6 @@ RUN go mod download
 # Copy source code
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-COPY pkg/ ./pkg/
 COPY migrations/ ./migrations/
 
 # Build arguments for version info
