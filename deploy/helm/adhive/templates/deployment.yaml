@@ -103,34 +103,34 @@ spec:
         - name: PORT
           value: {{ .Values.env.PORT | quote }}
         - name: DATA_DIR
-          value: {{ .Values.env.DATA_DIR }}
+          value: {{ .Values.env.DATA_DIR | quote }}
         - name: GO_ENV
-          value: {{ .Values.env.GO_ENV }}
+          value: {{ .Values.env.GO_ENV | quote }}
         - name: LOG_LEVEL
-          value: {{ .Values.env.LOG_LEVEL }}
+          value: {{ .Values.env.LOG_LEVEL | quote }}
         - name: HTTPS_ENABLED
-          value: {{ .Values.env.HTTPS_ENABLED }}
+          value: {{ .Values.env.HTTPS_ENABLED | quote }}
         - name: CORS_ALLOWED_ORIGINS
-          value: {{ .Values.env.CORS_ALLOWED_ORIGINS }}
+          value: {{ .Values.env.CORS_ALLOWED_ORIGINS | quote }}
         - name: RATE_LIMIT_GLOBAL
           value: {{ .Values.env.RATE_LIMIT_GLOBAL | quote }}
         - name: RATE_LIMIT_AUTH
           value: {{ .Values.env.RATE_LIMIT_AUTH | quote }}
         - name: CSRF_ENABLED
-          value: {{ .Values.env.CSRF_ENABLED }}
+          value: {{ .Values.env.CSRF_ENABLED | quote }}
         - name: CSRF_SECURE
-          value: {{ .Values.env.CSRF_SECURE }}
+          value: {{ .Values.env.CSRF_SECURE | quote }}
         - name: CSRF_SAME_SITE
-          value: {{ .Values.env.CSRF_SAME_SITE }}
+          value: {{ .Values.env.CSRF_SAME_SITE | quote }}
         - name: DEBUG
-          value: {{ .Values.env.DEBUG }}
+          value: {{ .Values.env.DEBUG | quote }}
         {{- if .Values.env.USER_AGENT }}
         - name: USER_AGENT
-          value: {{ .Values.env.USER_AGENT }}
+          value: {{ .Values.env.USER_AGENT | quote }}
         {{- end }}
         {{- if .Values.env.HUMAN_DOMAINS }}
         - name: HUMAN_DOMAINS
-          value: {{ .Values.env.HUMAN_DOMAINS }}
+          value: {{ .Values.env.HUMAN_DOMAINS | quote }}
         {{- end }}
         {{- if .Values.secret.enabled }}
         - name: SESSION_SECRET
@@ -141,7 +141,7 @@ spec:
               optional: false
         {{- else }}
         - name: SESSION_SECRET
-          value: {{ .Values.env.SESSION_SECRET }}
+          value: {{ .Values.env.SESSION_SECRET | quote }}
         {{- end }}
         volumeMounts:
         {{- if .Values.persistence.enabled }}
