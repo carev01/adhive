@@ -132,10 +132,10 @@ func TestAuthLoginRateLimit_MiddlewareBlocked(t *testing.T) {
 	testRL := &AuthRateLimiter{
 		loginAttempts:    make(map[string][]time.Time),
 		registerAttempts: make(map[string][]time.Time),
-		loginLimit:      5,
-		loginWindow:     1 * time.Minute,
-		registerLimit:   3,
-		registerWindow:  1 * time.Hour,
+		loginLimit:       5,
+		loginWindow:      1 * time.Minute,
+		registerLimit:    3,
+		registerWindow:   1 * time.Hour,
 	}
 	// Use up all login attempts
 	for i := 0; i < 5; i++ {

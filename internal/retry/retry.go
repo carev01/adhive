@@ -43,29 +43,29 @@ func ArchiveConfig() Config {
 // Returns the last error after all attempts are exhausted.
 func Do(ctx context.Context, cfg Config, isRetryable func(error) bool, fn func() error) error {
 	var lastErr error
-	
+
 	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
-		// Check if context is cancelled
+		// Check if context is canceled
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		
+
 		// Execute the function
 		err := fn()
 		if err == nil {
 			return nil // Success
 		}
-		
+
 		lastErr = err
-		
+
 		// Check if we should retry
 		if attempt >= cfg.MaxAttempts || !isRetryable(err) {
 			return lastErr
 		}
-		
+
 		// Calculate delay with exponential backoff
 		delay := calculateDelay(attempt, cfg)
-		
+
 		// Wait with context cancellation support
 		select {
 		case <-ctx.Done():
@@ -74,7 +74,7 @@ func Do(ctx context.Context, cfg Config, isRetryable func(error) bool, fn func()
 			// Continue to next attempt
 		}
 	}
-	
+
 	return lastErr
 }
 
@@ -82,29 +82,29 @@ func Do(ctx context.Context, cfg Config, isRetryable func(error) bool, fn func()
 // Similar to Do but returns both a result and an error.
 func DoWithResult(ctx context.Context, cfg Config, isRetryable func(error) bool, fn func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	
+
 	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
-		// Check if context is cancelled
+		// Check if context is canceled
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		
+
 		// Execute the function
 		result, err := fn()
 		if err == nil {
 			return result, nil // Success
 		}
-		
+
 		lastErr = err
-		
+
 		// Check if we should retry
 		if attempt >= cfg.MaxAttempts || !isRetryable(err) {
 			return nil, lastErr
 		}
-		
+
 		// Calculate delay with exponential backoff
 		delay := calculateDelay(attempt, cfg)
-		
+
 		// Wait with context cancellation support
 		select {
 		case <-ctx.Done():
@@ -113,7 +113,7 @@ func DoWithResult(ctx context.Context, cfg Config, isRetryable func(error) bool,
 			// Continue to next attempt
 		}
 	}
-	
+
 	return nil, lastErr
 }
 
@@ -124,15 +124,15 @@ func calculateDelay(attempt int, cfg Config) time.Duration {
 	for i := 1; i < attempt; i++ {
 		delay *= cfg.Multiplier
 	}
-	
+
 	// Cap at MaxDelay
 	if delay > float64(cfg.MaxDelay) {
 		delay = float64(cfg.MaxDelay)
 	}
-	
+
 	// Add jitter
 	delay = addJitter(delay, cfg.Jitter)
-	
+
 	return time.Duration(delay)
 }
 
@@ -142,10 +142,10 @@ func addJitter(delay float64, jitter float64) float64 {
 	if jitter <= 0 {
 		return delay
 	}
-	
+
 	// Generate random factor between (1 - jitter) and (1 + jitter)
 	jitterRange := jitter * 2
 	randomFactor := rand.Float64()*jitterRange + (1 - jitter)
-	
+
 	return delay * randomFactor
 }

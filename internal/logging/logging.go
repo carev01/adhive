@@ -84,8 +84,8 @@ func SetLevel(level slog.Level) {
 	// This requires replacing the handler, but for simplicity we recreate the logger
 	defaultLogger = &Logger{
 		Logger: slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level:       level,
-			AddSource:   true,
+			Level:     level,
+			AddSource: true,
 		})),
 	}
 }
@@ -162,13 +162,13 @@ func (l *Logger) Error(err error, msg string, args ...any) {
 // with any additional fields provided.
 func (l *Logger) LogError(ctx context.Context, err error, message string, fields ...slog.Attr) {
 	logger := l.WithContext(ctx)
-	
+
 	// Build args for Error method
 	args := []any{}
 	for _, f := range fields {
 		args = append(args, f.Key, f.Value.Any())
 	}
-	
+
 	logger.Error(err, message, args...)
 }
 

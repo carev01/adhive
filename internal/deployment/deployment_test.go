@@ -406,7 +406,7 @@ func TestNginxConfigHasGzip(t *testing.T) {
 // TestGoBuildVerifies the Go project builds successfully
 func TestGoBuild(t *testing.T) {
 	root := GetProjectRoot()
-	
+
 	// Check that go.mod exists
 	_, err := os.Stat(filepath.Join(root, "go.mod"))
 	if err != nil {

@@ -31,9 +31,9 @@ type AppConfig struct {
 	CORSAllowedOrigins string
 
 	// CSRF
-	CSRFEnabled   bool
-	CSRFSecure    bool
-	CSRFSameSite  string
+	CSRFEnabled  bool
+	CSRFSecure   bool
+	CSRFSameSite string
 
 	// Playwright
 	UserAgent    string

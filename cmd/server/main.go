@@ -27,9 +27,9 @@ import (
 
 // Version info - set via ldflags during build
 var (
-	version    = "latest"
-	commit     = "unknown"
-	buildDate  = "unknown"
+	version   = "latest"
+	commit    = "unknown"
+	buildDate = "unknown"
 )
 
 func init() {
@@ -70,7 +70,7 @@ func getDurationEnv(key string, defaultVal time.Duration) time.Duration {
 // Production default: empty (secure by default)
 func getCORSOrigins() []string {
 	envOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
-	
+
 	if envOrigins == "" {
 		// Check if running in development mode (no DB_PASSWORD set = local dev)
 		dbPassword := os.Getenv("DB_PASSWORD")
@@ -88,7 +88,7 @@ func getCORSOrigins() []string {
 		// Production - require explicit configuration
 		return []string{}
 	}
-	
+
 	// Parse comma-separated origins
 	origins := strings.Split(envOrigins, ",")
 	for i, o := range origins {
@@ -265,16 +265,16 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 	r.Use(middleware.RawPathTraversalGuard())
 	r.Use(middleware.InputSanitizer())
 	r.Use(middleware.SecurityHeaders())
-	
+
 	// Rate limiting: configurable via environment variables
 	// Default: 100 requests per minute, can be adjusted with RATE_LIMIT and RATE_LIMIT_WINDOW
 	rateLimit := getIntEnv("RATE_LIMIT", 100)
 	rateLimitWindow := getDurationEnv("RATE_LIMIT_WINDOW", time.Minute)
 	r.Use(middleware.RateLimit(rateLimit, rateLimitWindow))
-	
+
 	// Request size limit: 10MB for all requests
 	r.Use(middleware.RequestSizeLimit(10 * 1024 * 1024))
-	
+
 	// Strict CORS (origins from environment, defaults to localhost in dev)
 	r.Use(middleware.StrictCORS(getCORSOrigins()))
 

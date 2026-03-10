@@ -113,7 +113,7 @@ func (r *TagRepository) GetTagsWithCount(userID string) ([]model.TagWithCount, e
 	result := make([]model.TagWithCount, len(tags))
 	for i, tag := range tags {
 		result[i] = model.TagWithCount{
-			Tag:  tag,
+			Tag:   tag,
 			Count: 0, // Will be populated below
 		}
 		var count int64

@@ -165,10 +165,7 @@ func loadMigrations(dir string) ([]Migration, error) {
 			if err != nil {
 				return nil, err
 			}
-			m, err := parseMigration(e.Name(), string(data))
-			if err != nil {
-				return nil, fmt.Errorf("parse %s: %w", e.Name(), err)
-			}
+			m := parseMigration(e.Name(), string(data))
 			migrations = append(migrations, m)
 		}
 	}
@@ -181,14 +178,14 @@ func loadMigrations(dir string) ([]Migration, error) {
 	return migrations, nil
 }
 
-func parseMigration(filename, content string) (Migration, error) {
+func parseMigration(filename, content string) Migration {
 	id := strings.TrimSuffix(filename, filepath.Ext(filename))
 
 	// Simple split by -- +migrate marker
 	parts := strings.Split(content, "-- +migrate ")
-	
+
 	migration := Migration{ID: id}
-	
+
 	for i := 1; i < len(parts); i++ {
 		part := parts[i]
 		if strings.HasPrefix(part, "Up") {
@@ -208,7 +205,7 @@ func parseMigration(filename, content string) (Migration, error) {
 		}
 	}
 
-	return migration, nil
+	return migration
 }
 
 func createMigration(name, dir string) error {

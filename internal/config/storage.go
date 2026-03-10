@@ -20,9 +20,9 @@ type StorageConfig struct {
 func DefaultStorageConfig() *StorageConfig {
 	// Check for unified DATA_DIR first
 	dataDir := os.Getenv("DATA_DIR")
-	
+
 	var baseDir, dbPath string
-	
+
 	if dataDir != "" {
 		// Use unified DATA_DIR
 		baseDir = dataDir
@@ -33,13 +33,13 @@ func DefaultStorageConfig() *StorageConfig {
 		if baseDir == "" {
 			baseDir = "./data"
 		}
-		
+
 		dbPath = os.Getenv("DB_PATH")
 		if dbPath == "" {
 			dbPath = "ad-catalog.db"
 		}
 	}
-	
+
 	return &StorageConfig{
 		BaseDir:     baseDir,
 		ArchivesDir: filepath.Join(baseDir, "archives"),
@@ -57,7 +57,7 @@ func GetDBPath() string {
 	if dataDir != "" {
 		return filepath.Join(dataDir, "adhive.db")
 	}
-	
+
 	// Fall back to DB_PATH
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
@@ -73,7 +73,7 @@ func (s *StorageConfig) EnsureDirectories() error {
 		s.ArchivesDir,
 		s.ThumbDir,
 	}
-	
+
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err

@@ -28,7 +28,7 @@ func NewThumbnailConverter(shioriThumbsDir, adhiveThumbsDir string) *ThumbnailCo
 	if filepath.Base(adhiveThumbsDir) == "thumbnails" {
 		dataDir = filepath.Dir(adhiveThumbsDir)
 	}
-	
+
 	return &ThumbnailConverter{
 		shioriThumbsDir: shioriThumbsDir,
 		adhiveThumbsDir: adhiveThumbsDir,
@@ -81,7 +81,7 @@ func (tc *ThumbnailConverter) ConvertThumbnail(shioriID int, adhiveEntryID strin
 		EntryID:    adhiveEntryID,
 		SourceType: model.ThumbnailCandidateSourceUpload,
 		Path:       relPath,
-		Score:      0.8, // High score for imported thumbnails
+		Score:      0.8,  // High score for imported thumbnails
 		Selected:   true, // Auto-select imported thumbnails
 		CreatedAt:  time.Now(),
 	}
@@ -103,7 +103,7 @@ func (tc *ThumbnailConverter) ConvertAll(idMapping map[int]string) (int, int, []
 			skipCount++
 			continue
 		}
-		
+
 		// Skip silently if no thumbnail exists for this ID
 		if candidate == nil {
 			skipCount++

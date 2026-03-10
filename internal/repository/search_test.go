@@ -10,18 +10,18 @@ import (
 func TestEntryRepository_Search_MethodExists(t *testing.T) {
 	// This test verifies the Search method exists and has correct signature
 	// Full integration tests would require database setup with FTS5
-	
+
 	repo := &EntryRepository{}
-	
+
 	// Verify method signature matches expected
 	var _ func(ctx context.Context, userID, query string, filter *model.EntryFilter) (*model.EntryListResult, error) = repo.Search
-	
+
 	t.Log("Search method signature verified")
 }
 
 func TestEntryRepository_SearchQueryBuilding(t *testing.T) {
 	// Test query building logic (unit test without DB)
-	
+
 	tests := []struct {
 		name       string
 		input      string

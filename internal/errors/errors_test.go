@@ -78,10 +78,10 @@ func TestAppError_Unwrap_NilCause(t *testing.T) {
 
 func TestIsAppError(t *testing.T) {
 	tests := []struct {
-		name       string
-		err        error
-		wantFound  bool
-		wantCode   ErrorCode
+		name      string
+		err       error
+		wantFound bool
+		wantCode  ErrorCode
 	}{
 		{
 			name:      "is AppError",
@@ -133,9 +133,9 @@ func TestIsAppError(t *testing.T) {
 
 func TestIsRetryable(t *testing.T) {
 	tests := []struct {
-		name       string
-		err        error
-		wantRetry  bool
+		name      string
+		err       error
+		wantRetry bool
 	}{
 		{
 			name:      "validation error is not retryable",
@@ -312,26 +312,26 @@ func TestNewExternalError(t *testing.T) {
 
 func TestAppError_WithContext(t *testing.T) {
 	err := NewValidationError(CodeInvalidInput, "invalid input")
-	
+
 	// Test adding context
 	err = err.WithContext("field", "email")
 	err = err.WithContext("value", "not-an-email")
-	
+
 	if err.Context == nil {
 		t.Fatal("Context should not be nil after WithContext")
 	}
-	
+
 	if err.Context["field"] != "email" {
 		t.Errorf("Context[field] = %v, want 'email'", err.Context["field"])
 	}
 	if err.Context["value"] != "not-an-email" {
 		t.Errorf("Context[value] = %v, want 'not-an-email'", err.Context["value"])
 	}
-	
+
 	// Test chaining
 	err2 := NewNotFoundError(CodeEntryNotFound, "entry").
 		WithContext("entry_id", "123")
-	
+
 	if err2.Context["entry_id"] != "123" {
 		t.Errorf("Context[entry_id] = %v, want '123'", err2.Context["entry_id"])
 	}
@@ -339,10 +339,10 @@ func TestAppError_WithContext(t *testing.T) {
 
 func TestAppError_WithContext_Empty(t *testing.T) {
 	err := &AppError{}
-	
+
 	// Adding context to error with nil Context map
 	err = err.WithContext("key", "value")
-	
+
 	if err.Context == nil {
 		t.Error("Context should be initialized if nil")
 	}

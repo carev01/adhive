@@ -146,15 +146,15 @@ func isValidRevisionID(v string) bool {
 
 // rewriteArchiveAssetLinks rewrites relative asset URLs in archived HTML to absolute API paths.
 func rewriteArchiveAssetLinks(html string, revID, entryID string) string {
-	// Rewrite relative paths like "assets/xxx.jpg" or "/assets/xxx.jpg" 
+	// Rewrite relative paths like "assets/xxx.jpg" or "/assets/xxx.jpg"
 	// to "/api/v1/files/archive/{entryID}/{revisionID}/assets/xxx.jpg"
-	
+
 	// Pattern 1: src="assets/..." or src="/assets/..." (no leading slash)
 	re1 := regexp.MustCompile(`src=["'](assets/[^"']*)["']`)
 	result := re1.ReplaceAllStringFunc(html, func(match string) string {
 		return `src="/api/v1/files/archive/` + entryID + `/` + revID + `/` + match[5:] // remove src="
 	})
-	
+
 	// Pattern 2: href="assets/..." or href="/assets/..."
 	re2 := regexp.MustCompile(`href=["'](assets/[^"']*)["']`)
 	result = re2.ReplaceAllStringFunc(result, func(match string) string {

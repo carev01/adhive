@@ -38,8 +38,8 @@ func DefaultCSRFConfig() CSRFConfig {
 			CookieName: CSRFCookieName,
 			CookiePath: "/",
 			Secure:     false,
-			SameSite:  "Disabled",
-			MaxAge:    0,
+			SameSite:   "Disabled",
+			MaxAge:     0,
 		}
 	}
 
@@ -62,22 +62,22 @@ func DefaultCSRFConfig() CSRFConfig {
 		CookieName: CSRFCookieName,
 		CookiePath: "/",
 		Secure:     secure,
-		SameSite:  sameSite,
-		MaxAge:    3600 * 24, // 24 hours
+		SameSite:   sameSite,
+		MaxAge:     3600 * 24, // 24 hours
 	}
 }
 
 // CSRF returns a CSRF protection middleware
 func CSRF() gin.HandlerFunc {
 	config := DefaultCSRFConfig()
-	
+
 	return func(c *gin.Context) {
 		// Skip if CSRF is disabled
 		if config.SameSite == "Disabled" {
 			c.Next()
 			return
 		}
-		
+
 		// Debug: Log CSRF validation attempt
 		if os.Getenv("DEBUG") == "true" {
 			_, hasCookie := c.Cookie(config.CookieName)
@@ -86,14 +86,14 @@ func CSRF() gin.HandlerFunc {
 				c.GetHeader(CSRFHeaderName) != "",
 				hasCookie)
 		}
-		
+
 		// Skip safe methods
-		if c.Request.Method == "GET" || c.Request.Method == "HEAD" || 
-		   c.Request.Method == "OPTIONS" || c.Request.Method == "TRACE" {
+		if c.Request.Method == "GET" || c.Request.Method == "HEAD" ||
+			c.Request.Method == "OPTIONS" || c.Request.Method == "TRACE" {
 			c.Next()
 			return
 		}
-		
+
 		// Check for CSRF token in header
 		tokenHeader := c.GetHeader(CSRFHeaderName)
 		if tokenHeader == "" {
@@ -105,7 +105,7 @@ func CSRF() gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		// Get token from cookie
 		tokenCookie, err := c.Cookie(config.CookieName)
 		if err != nil {
@@ -117,7 +117,7 @@ func CSRF() gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		// Constant-time comparison to prevent timing attacks
 		if subtle.ConstantTimeCompare([]byte(tokenHeader), []byte(tokenCookie)) != 1 {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
@@ -128,7 +128,7 @@ func CSRF() gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -136,11 +136,11 @@ func CSRF() gin.HandlerFunc {
 // CSRFTokenHandler returns a handler that generates CSRF tokens
 func CSRFTokenHandler() gin.HandlerFunc {
 	config := DefaultCSRFConfig()
-	
+
 	return func(c *gin.Context) {
 		// Generate new token
 		token := uuid.New().String()
-		
+
 		// Set cookie (HttpOnly to prevent JavaScript access)
 		c.SetCookie(
 			config.CookieName,
@@ -151,7 +151,7 @@ func CSRFTokenHandler() gin.HandlerFunc {
 			config.Secure,
 			true, // HttpOnly
 		)
-		
+
 		// Return token in response for non-JS clients
 		c.JSON(http.StatusOK, gin.H{
 			"token": token,
@@ -163,12 +163,12 @@ func CSRFTokenHandler() gin.HandlerFunc {
 func CSRFWithConfig(config CSRFConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Skip safe methods
-		if c.Request.Method == "GET" || c.Request.Method == "HEAD" || 
-		   c.Request.Method == "OPTIONS" || c.Request.Method == "TRACE" {
+		if c.Request.Method == "GET" || c.Request.Method == "HEAD" ||
+			c.Request.Method == "OPTIONS" || c.Request.Method == "TRACE" {
 			c.Next()
 			return
 		}
-		
+
 		// Check for CSRF token in header
 		tokenHeader := c.GetHeader(CSRFHeaderName)
 		if tokenHeader == "" {
@@ -180,7 +180,7 @@ func CSRFWithConfig(config CSRFConfig) gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		// Get token from cookie
 		tokenCookie, err := c.Cookie(config.CookieName)
 		if err != nil {
@@ -192,7 +192,7 @@ func CSRFWithConfig(config CSRFConfig) gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		// Constant-time comparison to prevent timing attacks
 		if subtle.ConstantTimeCompare([]byte(tokenHeader), []byte(tokenCookie)) != 1 {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
@@ -203,7 +203,7 @@ func CSRFWithConfig(config CSRFConfig) gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -211,17 +211,17 @@ func CSRFWithConfig(config CSRFConfig) gin.HandlerFunc {
 // initCSRFToken initializes CSRF token if not present
 func initCSRFToken(c *gin.Context) {
 	config := DefaultCSRFConfig()
-	
+
 	// Check if token already exists
 	_, err := c.Cookie(config.CookieName)
 	if err == nil {
 		// Token exists, don't regenerate
 		return
 	}
-	
+
 	// Generate new token
 	token := uuid.New().String()
-	
+
 	// Set cookie
 	c.SetCookie(
 		config.CookieName,
@@ -238,8 +238,8 @@ func initCSRFToken(c *gin.Context) {
 func CSRFInit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Initialize token for all non-safe requests that don't have one
-		if c.Request.Method != "GET" && c.Request.Method != "HEAD" && 
-		   c.Request.Method != "OPTIONS" && c.Request.Method != "TRACE" {
+		if c.Request.Method != "GET" && c.Request.Method != "HEAD" &&
+			c.Request.Method != "OPTIONS" && c.Request.Method != "TRACE" {
 			initCSRFToken(c)
 		}
 		c.Next()

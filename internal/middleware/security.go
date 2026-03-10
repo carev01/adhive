@@ -15,19 +15,19 @@ func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// X-Frame-Options - prevent clickjacking
 		c.Header("X-Frame-Options", "DENY")
-		
+
 		// X-Content-Type-Options - prevent MIME type sniffing
 		c.Header("X-Content-Type-Options", "nosniff")
-		
+
 		// X-XSS-Protection (legacy but still useful)
 		c.Header("X-XSS-Protection", "1; mode=block")
-		
+
 		// Referrer-Policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		
+
 		// Content-Security-Policy
 		c.Header("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'")
-		
+
 		c.Next()
 	}
 }
@@ -59,13 +59,13 @@ type RateLimiter struct {
 
 // AuthRateLimiter is a separate rate limiter for auth endpoints with stricter limits
 type AuthRateLimiter struct {
-	mu           sync.Mutex
-	loginAttempts  map[string][]time.Time  // IP -> timestamps
+	mu               sync.Mutex
+	loginAttempts    map[string][]time.Time // IP -> timestamps
 	registerAttempts map[string][]time.Time // IP -> timestamps
-	loginLimit    int
-	loginWindow   time.Duration
-	registerLimit int
-	registerWindow time.Duration
+	loginLimit       int
+	loginWindow      time.Duration
+	registerLimit    int
+	registerWindow   time.Duration
 }
 
 // NewAuthRateLimiter creates a rate limiter for auth endpoints
@@ -73,10 +73,10 @@ func NewAuthRateLimiter() *AuthRateLimiter {
 	return &AuthRateLimiter{
 		loginAttempts:    make(map[string][]time.Time),
 		registerAttempts: make(map[string][]time.Time),
-		loginLimit:      5,           // 5 login attempts
-		loginWindow:     1 * time.Minute,
-		registerLimit:   3,           // 3 registrations per hour
-		registerWindow:  1 * time.Hour,
+		loginLimit:       5, // 5 login attempts
+		loginWindow:      1 * time.Minute,
+		registerLimit:    3, // 3 registrations per hour
+		registerWindow:   1 * time.Hour,
 	}
 }
 
@@ -84,22 +84,22 @@ func NewAuthRateLimiter() *AuthRateLimiter {
 func (rl *AuthRateLimiter) isLoginAllowed(ip string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	now := time.Now()
 	var valid []time.Time
-	
+
 	// Filter to only recent attempts within window
 	for _, t := range rl.loginAttempts[ip] {
 		if now.Sub(t) < rl.loginWindow {
 			valid = append(valid, t)
 		}
 	}
-	
+
 	if len(valid) >= rl.loginLimit {
 		rl.loginAttempts[ip] = valid
 		return false
 	}
-	
+
 	rl.loginAttempts[ip] = append(valid, now)
 	return true
 }
@@ -108,22 +108,22 @@ func (rl *AuthRateLimiter) isLoginAllowed(ip string) bool {
 func (rl *AuthRateLimiter) isRegisterAllowed(ip string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	now := time.Now()
 	var valid []time.Time
-	
+
 	// Filter to only recent attempts within window
 	for _, t := range rl.registerAttempts[ip] {
 		if now.Sub(t) < rl.registerWindow {
 			valid = append(valid, t)
 		}
 	}
-	
+
 	if len(valid) >= rl.registerLimit {
 		rl.registerAttempts[ip] = valid
 		return false
 	}
-	
+
 	rl.registerAttempts[ip] = append(valid, now)
 	return true
 }
@@ -170,22 +170,22 @@ func (rl *RateLimiter) cleanup() {
 func (rl *RateLimiter) isAllowed(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	now := time.Now()
 	var valid []time.Time
-	
+
 	// Filter to only recent requests within window
 	for _, t := range rl.requests[key] {
 		if now.Sub(t) < rl.window {
 			valid = append(valid, t)
 		}
 	}
-	
+
 	if len(valid) >= rl.limit {
 		rl.requests[key] = valid
 		return false
 	}
-	
+
 	rl.requests[key] = append(valid, now)
 	return true
 }
@@ -193,11 +193,11 @@ func (rl *RateLimiter) isAllowed(key string) bool {
 // RateLimit returns a rate limiting middleware
 func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
 	limiter := NewRateLimiter(limit, window)
-	
+
 	return func(c *gin.Context) {
 		// Use IP + user agent as key
 		key := c.ClientIP() + ":" + c.Request.UserAgent()
-		
+
 		if !limiter.isAllowed(key) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"type":   "about:blank",
@@ -207,11 +207,11 @@ func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		// Add rate limit headers
 		c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
 		c.Header("X-RateLimit-Window", window.String())
-		
+
 		c.Next()
 	}
 }
@@ -220,7 +220,7 @@ func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
 func StrictCORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// Check if origin is allowed
 		allowed := false
 		if origin == "" {
@@ -234,7 +234,7 @@ func StrictCORS(allowedOrigins []string) gin.HandlerFunc {
 				}
 			}
 		}
-		
+
 		if allowed {
 			if origin != "" && origin != "*" {
 				c.Header("Access-Control-Allow-Origin", origin)
@@ -247,12 +247,12 @@ func StrictCORS(allowedOrigins []string) gin.HandlerFunc {
 			// Expose rate limit headers
 			c.Header("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Window")
 		}
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -266,12 +266,12 @@ func InputSanitizer() gin.HandlerFunc {
 				c.Request.URL.Query()[key][i] = sanitizeInput(value)
 			}
 		}
-		
+
 		// Sanitize path parameters (where possible)
 		for i := range c.Params {
 			c.Params[i].Value = sanitizeInput(c.Params[i].Value)
 		}
-		
+
 		c.Next()
 	}
 }
@@ -280,10 +280,10 @@ func InputSanitizer() gin.HandlerFunc {
 func sanitizeInput(input string) string {
 	// Remove null bytes
 	input = strings.ReplaceAll(input, "\x00", "")
-	
+
 	// Trim whitespace
 	input = strings.TrimSpace(input)
-	
+
 	return input
 }
 
@@ -292,7 +292,7 @@ func ValidateSortParams(allowedColumns []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sortBy := c.Query("sort_by")
 		sortOrder := c.Query("sort_order")
-		
+
 		// Validate sort_by
 		if sortBy != "" {
 			allowed := false
@@ -312,7 +312,7 @@ func ValidateSortParams(allowedColumns []string) gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		// Validate sort_order
 		if sortOrder != "" {
 			sortOrder = strings.ToLower(sortOrder)
@@ -326,7 +326,7 @@ func ValidateSortParams(allowedColumns []string) gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		c.Next()
 	}
 }
@@ -335,7 +335,7 @@ func ValidateSortParams(allowedColumns []string) gin.HandlerFunc {
 func AuthLoginRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		
+
 		if !authRateLimiter.isLoginAllowed(ip) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"type":   "about:blank",
@@ -345,7 +345,7 @@ func AuthLoginRateLimit() gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -354,7 +354,7 @@ func AuthLoginRateLimit() gin.HandlerFunc {
 func AuthRegisterRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		
+
 		if !authRateLimiter.isRegisterAllowed(ip) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"type":   "about:blank",
@@ -364,7 +364,7 @@ func AuthRegisterRateLimit() gin.HandlerFunc {
 			})
 			return
 		}
-		
+
 		c.Next()
 	}
 }

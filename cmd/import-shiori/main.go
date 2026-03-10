@@ -16,9 +16,9 @@ import (
 	"github.com/carev01/adhive/internal/importer"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
-	"github.com/carev01/adhive/internal/shioriimport"
-	"github.com/google/uuid"
+	importtool "github.com/carev01/adhive/internal/shioriimport"
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -58,36 +58,36 @@ type ShioriTag struct {
 
 // IDMapper maps Shiori IDs to AdHive UUIDs
 type IDMapper struct {
-	ShioriToAdHive map[int]string `json:"shiori_to_adhive"`
+	ShioriToAdHive  map[int]string `json:"shiori_to_adhive"`
 	CompletedPhases []int          `json:"completed_phases"`
 	LastEntryID     int            `json:"last_entry_id"`
-	Timestamp       time.Time     `json:"timestamp"`
-	IsResumed       bool          `json:"is_resumed"`  // true if loaded from checkpoint
+	Timestamp       time.Time      `json:"timestamp"`
+	IsResumed       bool           `json:"is_resumed"` // true if loaded from checkpoint
 }
 
 type ImportError struct {
-	Phase       string    `json:"phase"`
-	BookmarkID  int       `json:"bookmark_id,omitempty"`
-	TagID       int       `json:"tag_id,omitempty"`
-	Error       string    `json:"error"`
-	Timestamp   time.Time `json:"timestamp"`
+	Phase      string    `json:"phase"`
+	BookmarkID int       `json:"bookmark_id,omitempty"`
+	TagID      int       `json:"tag_id,omitempty"`
+	Error      string    `json:"error"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 type ImportStats struct {
-	BookmarksFound   int            `json:"bookmarks_found"`
-	BookmarksImported int           `json:"bookmarks_imported"`
-	TagsFound       int            `json:"tags_found"`
-	TagsImported    int            `json:"tags_imported"`
-	ArchivesExtracted int          `json:"archives_extracted"`
-	ThumbnailsConverted int        `json:"thumbnails_converted"`
-	Skipped         int            `json:"skipped"`
-	Errors          []ImportError  `json:"errors"`
+	BookmarksFound      int           `json:"bookmarks_found"`
+	BookmarksImported   int           `json:"bookmarks_imported"`
+	TagsFound           int           `json:"tags_found"`
+	TagsImported        int           `json:"tags_imported"`
+	ArchivesExtracted   int           `json:"archives_extracted"`
+	ThumbnailsConverted int           `json:"thumbnails_converted"`
+	Skipped             int           `json:"skipped"`
+	Errors              []ImportError `json:"errors"`
 }
 
 var (
-	errors       []ImportError
-	stats        ImportStats
-	idMapper     = &IDMapper{
+	errors   []ImportError
+	stats    ImportStats
+	idMapper = &IDMapper{
 		ShioriToAdHive: make(map[int]string),
 	}
 	tagNameToID = make(map[string]string) // tag name -> AdHive tag UUID
@@ -109,7 +109,7 @@ func logError(err ImportError) {
 
 func main() {
 	flag.Parse()
-	
+
 	// Normal import flow...
 
 	// Validate required flags
@@ -150,7 +150,7 @@ func main() {
 	// Phase 2: Extract archives (optional)
 	if *archivesPath != "" {
 		logInfo("Extracting archives from Shiori (Phase 2)...")
-		
+
 		// Don't load checkpoint for fresh import - we'll use the data we just imported
 		// Only load checkpoint if we're doing archive-only extraction
 		if *resume && idMapper.ShioriToAdHive == nil {
@@ -191,7 +191,7 @@ func main() {
 		logInfo("Extracting %d archives (this may take a few minutes)...", len(idMapping))
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		
+
 		extractResults, err := extractor.ExtractAll(ctx, idMapping)
 		if err != nil {
 			logWarn("Archive extraction error: %v", err)
@@ -202,25 +202,25 @@ func main() {
 		revisionRepo := repository.NewArchiveRevisionRepository(db)
 		assetRepo := repository.NewArchiveAssetRepository(db)
 		thumbRepo := repository.NewThumbnailCandidateRepository(db)
-		
+
 		successCount := 0
 		failCount := 0
-		
+
 		for _, result := range extractResults {
 			if result.Success {
 				// Create archive revision record
 				revision := &model.ArchiveRevision{
-					ID:          result.RevisionID,
-					EntryID:     result.EntryID,
-					RevisionNo:  1,
-					Engine:      "shiori-migrated",
-					RootPath:    fmt.Sprintf("data/archives/%s/rev-0001", result.EntryID),
-					IndexPath:   fmt.Sprintf("data/archives/%s/rev-0001/index.html", result.EntryID),
+					ID:           result.RevisionID,
+					EntryID:      result.EntryID,
+					RevisionNo:   1,
+					Engine:       "shiori-migrated",
+					RootPath:     fmt.Sprintf("data/archives/%s/rev-0001", result.EntryID),
+					IndexPath:    fmt.Sprintf("data/archives/%s/rev-0001/index.html", result.EntryID),
 					ManifestPath: fmt.Sprintf("data/archives/%s/rev-0001/manifest.json", result.EntryID),
-					Status:      model.ArchiveRevisionStatusSuccess,
-					CapturedAt:  time.Now(),
-					CreatedAt:   time.Now(),
-					UpdatedAt:   time.Now(),
+					Status:       model.ArchiveRevisionStatusSuccess,
+					CapturedAt:   time.Now(),
+					CreatedAt:    time.Now(),
+					UpdatedAt:    time.Now(),
 				}
 				if err := revisionRepo.Create(context.Background(), revision); err != nil {
 					logWarn("Failed to create revision record for %s: %v", result.EntryID, err)
@@ -231,17 +231,17 @@ func main() {
 					var assetRecords []*model.ArchiveAsset
 					for _, asset := range result.Assets {
 						assetRecord := &model.ArchiveAsset{
-							ID:          uuid.New().String(),
-							RevisionID:  result.RevisionID,
-							RootPath:    fmt.Sprintf("data/archives/%s/rev-0001/assets", result.EntryID),
-							SourceURL:   asset.SourceURL,
-							LocalPath:   asset.LocalPath,
-							ContentHash: asset.ContentHash,
-							MimeType:    asset.MimeType,
-							Bytes:       asset.Bytes,
-							Kind:        model.ArchiveAssetKind(asset.Kind),
+							ID:             uuid.New().String(),
+							RevisionID:     result.RevisionID,
+							RootPath:       fmt.Sprintf("data/archives/%s/rev-0001/assets", result.EntryID),
+							SourceURL:      asset.SourceURL,
+							LocalPath:      asset.LocalPath,
+							ContentHash:    asset.ContentHash,
+							MimeType:       asset.MimeType,
+							Bytes:          asset.Bytes,
+							Kind:           model.ArchiveAssetKind(asset.Kind),
 							DownloadStatus: model.ArchiveAssetDownloadStatusOK,
-							CreatedAt:   time.Now(),
+							CreatedAt:      time.Now(),
 						}
 						assetRecords = append(assetRecords, assetRecord)
 					}
@@ -303,7 +303,7 @@ func main() {
 	// Phase 3: Convert thumbnails (optional)
 	if *thumbsPath != "" {
 		logInfo("Converting thumbnails (Phase 3)...")
-		
+
 		// Connect to database for thumbnail candidates
 		db, err := gorm.Open(sqlite.Open(*dbPath), &gorm.Config{})
 		if err != nil {
@@ -313,14 +313,14 @@ func main() {
 			if err := db.AutoMigrate(&model.ThumbnailCandidate{}); err != nil {
 				logWarn("Failed to migrate thumbnail_candidates table: %v", err)
 			}
-			
+
 			// Get thumbnail candidate repo
 			thumbRepo := repository.NewThumbnailCandidateRepository(db)
-			
+
 			// Create converter
 			adhiveDataDir := "./data"
 			converter := importer.NewThumbnailConverter(*thumbsPath, adhiveDataDir+"/thumbnails")
-			
+
 			// Convert each thumbnail
 			for shioriID, adhiveID := range idMapper.ShioriToAdHive {
 				candidate, err := converter.ConvertThumbnail(shioriID, adhiveID)
@@ -329,30 +329,30 @@ func main() {
 					stats.Skipped++
 					continue
 				}
-				
+
 				// Skip if no thumbnail exists for this entry
 				if candidate == nil {
 					// No thumbnail for this entry - skip silently
 					continue
 				}
-				
+
 				// Save to database
 				if err := thumbRepo.Create(context.Background(), candidate); err != nil {
 					logWarn("Failed to save thumbnail candidate: %v", err)
 					stats.Skipped++
 					continue
 				}
-				
+
 				// Update entry's thumbnail path to API URL format (not file path)
 				// Frontend expects: <img src="{entry.thumbnail_path}"/> to be API URL
 				db.Model(&model.CatalogEntry{}).Where("id = ?", adhiveID).Updates(map[string]interface{}{
 					"thumbnail_path":   "/api/v1/files/thumbnails/" + adhiveID,
 					"thumbnail_source": model.ThumbnailSourceAuto,
 				})
-				
+
 				stats.ThumbnailsConverted++
 			}
-			
+
 			logInfo("Converted %d thumbnails", stats.ThumbnailsConverted)
 		}
 	}
@@ -406,7 +406,7 @@ func importSQLData() error {
 	var inValues bool
 	var valuesBuffer strings.Builder
 
-// 	logVerbose("Starting scan of SQL file...")
+	// 	logVerbose("Starting scan of SQL file...")
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -417,13 +417,13 @@ func importSQLData() error {
 			currentTable = ""
 			inValues = false
 			valuesBuffer.Reset()
-			
+
 			// Extract table name
 			re := regexp.MustCompile("INSERT\\s+INTO\\s+[`]*(\\w+)[`]*")
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				currentTable = matches[1]
-// 				logVerbose("Detected table: %s", currentTable)
+				// 				logVerbose("Detected table: %s", currentTable)
 			}
 			// Check if VALUES is on this line
 			upperLine := strings.ToUpper(line)
@@ -434,7 +434,7 @@ func importSQLData() error {
 				if len(afterValues) > 0 {
 					// There's data on the same line
 					valuesBuffer.WriteString(afterValues)
-// 					logVerbose("Found VALUES with data, buffer: %d chars", valuesBuffer.Len())
+					// 					logVerbose("Found VALUES with data, buffer: %d chars", valuesBuffer.Len())
 				}
 				// Note: VALUES on its own line will get data on next lines
 				inValues = true
@@ -449,7 +449,7 @@ func importSQLData() error {
 			if strings.HasSuffix(line, ";") {
 				valuesStr := valuesBuffer.String()
 				valuesBuffer.Reset()
-				
+
 				if currentTable == "" {
 					logWarn("No table detected before semicolon, skipping")
 					continue
@@ -457,19 +457,11 @@ func importSQLData() error {
 
 				switch currentTable {
 				case "bookmark", "bookmarks":
-					parsed, err := parseBookmarks(valuesStr)
-					if err != nil {
-						logWarn("Failed to parse bookmarks: %v", err)
-					}
-					bookmarks = append(bookmarks, parsed...)
+					parsed := parseBookmarks(valuesStr)
 					stats.BookmarksFound += len(parsed)
 
 				case "tag", "tags":
-					parsed, err := parseTags(valuesStr)
-					if err != nil {
-						logWarn("Failed to parse tags: %v", err)
-					}
-					tags = append(tags, parsed...)
+					parsed := parseTags(valuesStr)
 					stats.TagsFound += len(parsed)
 				}
 
@@ -523,7 +515,7 @@ func importSQLData() error {
 		existing, _ := tagRepo.FindByName(*userID, tag.Name)
 		if existing != nil {
 			tagNameToID[tag.Name] = existing.ID
-// 			logVerbose("Tag '%s' already exists, using existing", tag.Name)
+			// 			logVerbose("Tag '%s' already exists, using existing", tag.Name)
 			continue
 		}
 
@@ -558,7 +550,7 @@ func importSQLData() error {
 		// Skip if URL already exists in AdHive for this user (duplicate)
 		existingEntry, err := entryRepo.FindByURL(context.Background(), *userID, bm.URL)
 		if err == nil && existingEntry != nil {
-// 			logVerbose("Skipping duplicate URL: %s", bm.URL)
+			// 			logVerbose("Skipping duplicate URL: %s", bm.URL)
 			idMapper.ShioriToAdHive[bm.ID] = existingEntry.ID // Map to existing entry
 			skipped++
 			continue
@@ -576,15 +568,15 @@ func importSQLData() error {
 		}
 
 		entry := &model.CatalogEntry{
-			ID:             entryID,
-			UserID:         *userID,
-			URL:            bm.URL,
-			Title:          bm.Title,
-			Description:    bm.Excerpt,
-			ArchiveStatus:  archiveStatus,
-			ImportedFrom:   "shiori",
-			CreatedAt:      bm.CreatedAt,
-			UpdatedAt:      time.Now(),
+			ID:            entryID,
+			UserID:        *userID,
+			URL:           bm.URL,
+			Title:         bm.Title,
+			Description:   bm.Excerpt,
+			ArchiveStatus: archiveStatus,
+			ImportedFrom:  "shiori",
+			CreatedAt:     bm.CreatedAt,
+			UpdatedAt:     time.Now(),
 		}
 
 		if err := entryRepo.Create(context.Background(), entry); err != nil {
@@ -622,13 +614,13 @@ func importSQLData() error {
 }
 
 // parseBookmarks parses bookmark INSERT VALUES - splits by ), or ); (outside quotes)
-func parseBookmarks(values string) ([]ShioriBookmark, error) {
+func parseBookmarks(values string) []ShioriBookmark {
 	var bookmarks []ShioriBookmark
 
 	values = strings.TrimSpace(values)
-	
+
 	if len(values) == 0 {
-		return bookmarks, nil
+		return bookmarks
 	}
 
 	// Split by ")," outside quotes - handle both backslash escapes and doubled quotes
@@ -637,10 +629,10 @@ func parseBookmarks(values string) ([]ShioriBookmark, error) {
 	inQuote := false
 	var quoteChar byte
 	escaped := false
-	
+
 	for i := 0; i < len(values); i++ {
 		ch := values[i]
-		
+
 		// Handle escaped characters
 		if escaped {
 			escaped = false
@@ -654,7 +646,7 @@ func parseBookmarks(values string) ([]ShioriBookmark, error) {
 				continue
 			}
 		}
-		
+
 		// Handle quote state
 		if !inQuote && (ch == '"' || ch == '\'') {
 			inQuote = true
@@ -670,15 +662,15 @@ func parseBookmarks(values string) ([]ShioriBookmark, error) {
 			}
 			continue
 		}
-		
+
 		// Outside quotes - check for ), or );
 		if !inQuote && i+1 < len(values) && ch == ')' && (values[i+1] == ',' || values[i+1] == ';') {
-			tuple := values[tupleStart:i+1]
+			tuple := values[tupleStart : i+1]
 			tuples = append(tuples, tuple)
 			tupleStart = i + 2
 		}
 	}
-	
+
 	// Add remaining
 	if tupleStart < len(values) {
 		tuples = append(tuples, values[tupleStart:])
@@ -704,21 +696,17 @@ func parseBookmarks(values string) ([]ShioriBookmark, error) {
 		bookmarks = append(bookmarks, bookmark)
 	}
 
-	return bookmarks, nil
+	return bookmarks
 }
 
-func parseBookmarkTuple(tuple string) (ShioriBookmark, error) {
-// 	logVerbose("parseBookmarkTuple: tuple len=%d, first 50: %s", len(tuple), tuple[:min(50, len(tuple))])
-	
-	// Parse CSV-like, handling quoted strings
-	fields, err := splitSQLValues(tuple)
-	if err != nil {
-		logWarn("splitSQLValues error: %v", err)
-		return ShioriBookmark{}, err
-	}
+func parseBookmarkTuple(tuple string) ShioriBookmark {
+	// 	logVerbose("parseBookmarkTuple: tuple len=%d, first 50: %s", len(tuple), tuple[:min(50, len(tuple))])
 
-// 	logVerbose("splitSQLValues returned %d fields", len(fields))
-	
+	// Parse CSV-like, handling quoted strings
+	fields := splitSQLValues(tuple)
+
+	// 	logVerbose("splitSQLValues returned %d fields", len(fields))
+
 	bm := ShioriBookmark{}
 
 	// Based on Shiori schema: id, url, title, excerpt, author, public, content, html, created_at, has_content, modified_at
@@ -731,21 +719,21 @@ func parseBookmarkTuple(tuple string) (ShioriBookmark, error) {
 		bm.Excerpt = unquoteSQL(fields[3])
 		bm.Author = unquoteSQL(fields[4])
 		bm.Content = unquoteSQL(fields[6])
-		
+
 		// Parse created_at
 		if createdAt, err := time.Parse("2006-01-02 15:04:05", fields[8]); err == nil {
 			bm.CreatedAt = createdAt
 		}
-		
+
 		bm.HasContent = fields[9] == "1"
-		
+
 		// Also check if HTML field is not empty - this means we have content even if has_content=0
 		htmlContent := unquoteSQL(fields[7])
 		if htmlContent != "" {
 			bm.HTML = htmlContent
 			bm.HasContent = true // We have HTML content
 		}
-		
+
 		if modifiedAt, err := time.Parse("2006-01-02 15:04:05", fields[10]); err == nil {
 			bm.ModifiedAt = modifiedAt
 		}
@@ -755,7 +743,7 @@ func parseBookmarkTuple(tuple string) (ShioriBookmark, error) {
 }
 
 // parseTags parses tag INSERT VALUES
-func parseTags(values string) ([]ShioriTag, error) {
+func parseTags(values string) []ShioriTag {
 	var tags []ShioriTag
 
 	values = strings.TrimSpace(values)
@@ -774,11 +762,7 @@ func parseTags(values string) ([]ShioriTag, error) {
 			continue
 		}
 		tuple := match[1]
-		fields, err := splitSQLValues(tuple)
-		if err != nil {
-			continue
-		}
-
+		fields := splitSQLValues(tuple)
 		if len(fields) >= 2 {
 			tag := ShioriTag{
 				ID:   toInt(fields[0]),
@@ -788,11 +772,11 @@ func parseTags(values string) ([]ShioriTag, error) {
 		}
 	}
 
-	return tags, nil
+	return tags
 }
 
 // splitSQLValues splits SQL values handling quoted strings
-func splitSQLValues(s string) ([]string, error) {
+func splitSQLValues(s string) []string {
 	var fields []string
 	var current strings.Builder
 	inQuote := false
@@ -840,7 +824,7 @@ func splitSQLValues(s string) ([]string, error) {
 	}
 	fields = append(fields, current.String())
 
-	return fields, nil
+	return fields
 }
 
 func unquoteSQL(s string) string {
@@ -904,13 +888,13 @@ func importFromJSON(jsonPath string) error {
 
 	// Parse JSON structure from shiori-parser
 	type JSONBookmark struct {
-		ID          string `json:"id"`
-		URL         string `json:"url"`
-		Title       string `json:"title"`
-		Excerpt     string `json:"excerpt"`
-		Author      string `json:"author"`
-		CreatedAt   string `json:"created_at"`
-		ModifiedAt  string `json:"modified_at"`
+		ID         string `json:"id"`
+		URL        string `json:"url"`
+		Title      string `json:"title"`
+		Excerpt    string `json:"excerpt"`
+		Author     string `json:"author"`
+		CreatedAt  string `json:"created_at"`
+		ModifiedAt string `json:"modified_at"`
 	}
 
 	type JSONTag struct {
@@ -920,7 +904,7 @@ func importFromJSON(jsonPath string) error {
 
 	type JSONBookmarkTag struct {
 		BookmarkID string `json:"bookmark_id"`
-		TagID     string `json:"tag_id"`
+		TagID      string `json:"tag_id"`
 	}
 
 	type JSONData struct {
@@ -978,7 +962,7 @@ func importFromJSON(jsonPath string) error {
 		existing, _ := tagRepo.FindByName(*userID, t.Name)
 		if existing != nil {
 			tagNameToID[t.Name] = existing.ID
-// 			logVerbose("Tag '%s' already exists, using existing", t.Name)
+			// 			logVerbose("Tag '%s' already exists, using existing", t.Name)
 			continue
 		}
 
@@ -1017,7 +1001,7 @@ func importFromJSON(jsonPath string) error {
 	for _, bm := range parsed.Bookmarks {
 		// Skip if URL empty (invalid)
 		if bm.URL == "" {
-// 			logVerbose("Skipping bookmark with empty URL (ID: %s)", bm.ID)
+			// 			logVerbose("Skipping bookmark with empty URL (ID: %s)", bm.ID)
 			skipped++
 			continue
 		}
@@ -1025,7 +1009,7 @@ func importFromJSON(jsonPath string) error {
 		// Skip if URL already exists in AdHive for this user (duplicate)
 		existingEntry, err := entryRepo.FindByURL(context.Background(), *userID, bm.URL)
 		if err == nil && existingEntry != nil {
-// 			logVerbose("Skipping duplicate URL: %s", bm.URL)
+			// 			logVerbose("Skipping duplicate URL: %s", bm.URL)
 			idMapper.ShioriToAdHive[toInt(bm.ID)] = existingEntry.ID
 			skipped++
 			continue
@@ -1043,15 +1027,15 @@ func importFromJSON(jsonPath string) error {
 		}
 
 		entry := &model.CatalogEntry{
-			ID:             entryID,
-			UserID:         *userID,
-			URL:            bm.URL,
-			Title:          bm.Title,
-			Description:    bm.Excerpt,
-			ArchiveStatus:  model.ArchiveStatusPending, // Will be updated after archive extraction
-			ImportedFrom:   "shiori",
-			CreatedAt:      createdAt,
-			UpdatedAt:      time.Now(),
+			ID:            entryID,
+			UserID:        *userID,
+			URL:           bm.URL,
+			Title:         bm.Title,
+			Description:   bm.Excerpt,
+			ArchiveStatus: model.ArchiveStatusPending, // Will be updated after archive extraction
+			ImportedFrom:  "shiori",
+			CreatedAt:     createdAt,
+			UpdatedAt:     time.Now(),
 		}
 
 		if err := entryRepo.Create(context.Background(), entry); err != nil {

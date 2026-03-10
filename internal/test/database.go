@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/carev01/adhive/internal/model"
@@ -39,7 +40,12 @@ func NewTempFileDB() (*gorm.DB, func(), error) {
 
 	// Cleanup function
 	cleanup := func() {
-		sqlDB, _ := db.DB()
+		sqlDB, err := db.DB()
+		if err != nil {
+			// Log or handle error appropriately in test context
+			fmt.Fprintf(os.Stderr, "failed to get underlying DB: %v\n", err)
+			return
+		}
 		if sqlDB != nil {
 			sqlDB.Close()
 		}

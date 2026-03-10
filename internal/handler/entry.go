@@ -18,10 +18,10 @@ import (
 
 // EntryHandler handles catalog entry HTTP requests
 type EntryHandler struct {
-	entryRepo      *repository.EntryRepository
-	tagRepo        *repository.TagRepository
-	storageConfig  *config.StorageConfig
-	archiveWorker  interface {
+	entryRepo     *repository.EntryRepository
+	tagRepo       *repository.TagRepository
+	storageConfig *config.StorageConfig
+	archiveWorker interface {
 		QueueJob(entryID string)
 		QueueJobs(entryIDs []string)
 	}
@@ -45,7 +45,10 @@ func NewEntryHandlerWithStorage(entryRepo *repository.EntryRepository, tagRepo *
 }
 
 // SetArchiveWorker sets the archive worker for auto-archiving
-func (h *EntryHandler) SetArchiveWorker(w interface{ QueueJob(entryID string); QueueJobs(entryIDs []string) }) {
+func (h *EntryHandler) SetArchiveWorker(w interface {
+	QueueJob(entryID string)
+	QueueJobs(entryIDs []string)
+}) {
 	h.archiveWorker = w
 }
 
@@ -96,8 +99,8 @@ type TagInfo struct {
 type EntryListResponse struct {
 	Entries []*EntryResponse `json:"entries"`
 	Total   int64            `json:"total"`
-	Page    int             `json:"page"`
-	Limit   int             `json:"limit"`
+	Page    int              `json:"page"`
+	Limit   int              `json:"limit"`
 }
 
 func entryToResponse(entry *model.CatalogEntry, tags []TagInfo) *EntryResponse {
@@ -160,19 +163,19 @@ func (h *EntryHandler) List(c *gin.Context) {
 	}
 
 	filter := &model.EntryFilter{
-		Page:            page,
-		Limit:           limit,
-		TagID:           tagID,
-		ExcludeTried:    excludeTried,
-		Search:          search,
-		DateFrom:        dateFrom,
-		DateTo:          dateTo,
-		Source:          source,
-		Location:        location,
-		SortBy:          sortBy,
-		SortOrder:       sortOrder,
-		HasInteraction:  hasInteraction,
-		MinScore:        minScore,
+		Page:           page,
+		Limit:          limit,
+		TagID:          tagID,
+		ExcludeTried:   excludeTried,
+		Search:         search,
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		Source:         source,
+		Location:       location,
+		SortBy:         sortBy,
+		SortOrder:      sortOrder,
+		HasInteraction: hasInteraction,
+		MinScore:       minScore,
 	}
 	if status != "" {
 		filter.Status = model.ArchiveStatus(status)

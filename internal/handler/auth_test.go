@@ -21,7 +21,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	_ = db.AutoMigrate(&model.User{}, &model.Session{})
 	return db
 }
 
@@ -63,7 +63,7 @@ func TestRegister_Success(t *testing.T) {
 	}
 
 	var resp handler.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.User.Email != "test@example.com" {
 		t.Errorf("expected email test@example.com, got %s", resp.User.Email)

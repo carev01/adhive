@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/carev01/adhive/internal/model"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -21,14 +21,14 @@ func TestArchiveRevisionRepository_GetByID(t *testing.T) {
 
 	// Create a revision
 	revision := &model.ArchiveRevision{
-		ID:         "test-rev-1",
-		EntryID:    "entry-1",
-		RevisionNo: 1,
-		Engine:     model.ArchiveEnginePlaywright,
-		RootPath:   "/data/archives/entry-1/rev-0001",
-		IndexPath:  "/data/archives/entry-1/rev-0001/index.html",
+		ID:           "test-rev-1",
+		EntryID:      "entry-1",
+		RevisionNo:   1,
+		Engine:       model.ArchiveEnginePlaywright,
+		RootPath:     "/data/archives/entry-1/rev-0001",
+		IndexPath:    "/data/archives/entry-1/rev-0001/index.html",
 		ManifestPath: "/data/archives/entry-1/rev-0001/manifest.json",
-		Status:     model.ArchiveRevisionStatusSuccess,
+		Status:       model.ArchiveRevisionStatusSuccess,
 	}
 	err = repo.Create(ctx, revision)
 	require.NoError(t, err)

@@ -35,23 +35,23 @@ func NewBoltExtractor(shioriArchiveDir, adhiveDataDir string) *BoltExtractor {
 
 // ExtractResult contains the result of extracting a single archive
 type ExtractResult struct {
-	BookmarkID   string           `json:"bookmark_id"`
-	EntryID      string           `json:"entry_id"`
-	RevisionID   string           `json:"revision_id"`
-	Success      bool             `json:"success"`
-	Error        string           `json:"error,omitempty"`
-	HTMLSize     int64            `json:"html_size"`
-	AssetsCount  int              `json:"assets_count"`
-	Assets       []ManifestAsset  `json:"assets"`
+	BookmarkID  string          `json:"bookmark_id"`
+	EntryID     string          `json:"entry_id"`
+	RevisionID  string          `json:"revision_id"`
+	Success     bool            `json:"success"`
+	Error       string          `json:"error,omitempty"`
+	HTMLSize    int64           `json:"html_size"`
+	AssetsCount int             `json:"assets_count"`
+	Assets      []ManifestAsset `json:"assets"`
 }
 
 // Manifest represents the archive manifest
 type Manifest struct {
-	Version     string            `json:"version"`
-	OriginalURL string            `json:"original_url"`
-	CapturedAt  time.Time         `json:"captured_at"`
-	Engine      string            `json:"engine"`
-	Assets      []ManifestAsset   `json:"assets"`
+	Version     string          `json:"version"`
+	OriginalURL string          `json:"original_url"`
+	CapturedAt  time.Time       `json:"captured_at"`
+	Engine      string          `json:"engine"`
+	Assets      []ManifestAsset `json:"assets"`
 }
 
 // ManifestAsset represents a single asset in the archive
@@ -107,7 +107,7 @@ func (e *BoltExtractor) ExtractArchive(ctx context.Context, bookmarkID, entryID 
 	}
 
 	archivePath := filepath.Join(e.shioriArchiveDir, bookmarkID)
-	
+
 	// Find the BoltDB file (usually the bookmark ID)
 	dbPath := archivePath
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
@@ -159,7 +159,7 @@ func (e *BoltExtractor) ExtractArchive(ctx context.Context, bookmarkID, entryID 
 	revisionDir := filepath.Join(e.adhiveDataDir, "archives", entryID, "rev-0001")
 	assetsDir := filepath.Join(revisionDir, "assets")
 	metaDir := filepath.Join(revisionDir, "meta")
-	
+
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		result.Error = fmt.Sprintf("failed to create revision dirs: %v", err)
 		return result
@@ -234,7 +234,7 @@ func (e *BoltExtractor) extractAssets(archivePath, assetsDir string) ([]Manifest
 	err = db.View(func(tx *bbolt.Tx) error {
 		return tx.ForEach(func(name []byte, bucket *bbolt.Bucket) error {
 			bucketName := string(name)
-			
+
 			// Skip the archive-root bucket (already handled)
 			if bucketName == "archive-root" || bucketName == "archive" {
 				return nil
@@ -248,14 +248,14 @@ func (e *BoltExtractor) extractAssets(archivePath, assetsDir string) ([]Manifest
 
 			// Get content type
 			contentType := string(bucket.Get([]byte("type")))
-			
+
 			// Decompress if needed
 			content = decompressGzip(content, contentType)
 
 			// Determine file extension and kind
 			ext := getExtension(contentType)
 			kind := getKind(contentType)
-			
+
 			// Generate filename from bucket name (hash-based for uniqueness)
 			safeName := sanitizeFilename(bucketName)
 			assetPath := filepath.Join(assetsDir, safeName+ext)
@@ -288,7 +288,7 @@ func (e *BoltExtractor) extractAssets(archivePath, assetsDir string) ([]Manifest
 }
 
 // decompressGzip decompresses gzip content if needed
-func decompressGzip(content []byte, contentType string) []byte {
+func decompressGzip(content []byte, _ string) []byte {
 	// Check for gzip magic bytes (1f 8b)
 	if len(content) >= 2 && content[0] == 0x1f && content[1] == 0x8b {
 		reader, err := gzip.NewReader(bytes.NewReader(content))
@@ -310,7 +310,7 @@ func rewriteHTMLURLs(html []byte, assets []ManifestAsset) []byte {
 	}
 
 	result := string(html)
-	
+
 	// Build a map of source URL to local path
 	urlMap := make(map[string]string)
 	for _, asset := range assets {
@@ -323,7 +323,7 @@ func rewriteHTMLURLs(html []byte, assets []ManifestAsset) []byte {
 		// Note: localPath already includes 'assets/' prefix from extractAssets, so don't add it again
 		result = strings.ReplaceAll(result, fmt.Sprintf("src=\"%s\"", sourceURL), fmt.Sprintf("src=\"%s\"", localPath))
 		result = strings.ReplaceAll(result, fmt.Sprintf("href=\"%s\"", sourceURL), fmt.Sprintf("href=\"%s\"", localPath))
-		
+
 		// Handle URLs without quotes (less common but possible)
 		result = strings.ReplaceAll(result, fmt.Sprintf("src='%s'", sourceURL), fmt.Sprintf("src='%s'", localPath))
 		result = strings.ReplaceAll(result, fmt.Sprintf("href='%s'", sourceURL), fmt.Sprintf("href='%s'", localPath))
@@ -388,16 +388,16 @@ func sanitizeFilename(name string) string {
 	safe := strings.ReplaceAll(name, "/", "_")
 	safe = strings.ReplaceAll(safe, "-", "_")
 	safe = strings.ReplaceAll(safe, ".", "_")
-	
+
 	// Remove any remaining unsafe characters
 	reg := regexp.MustCompile(`[^a-zA-Z0-9_]`)
 	safe = reg.ReplaceAllString(safe, "")
-	
+
 	// Limit length
 	if len(safe) > 100 {
 		safe = safe[:100]
 	}
-	
+
 	return safe
 }
 

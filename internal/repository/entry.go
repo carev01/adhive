@@ -128,13 +128,13 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 func (r *EntryRepository) Search(ctx context.Context, userID, query string, filter *model.EntryFilter) (*model.EntryListResult, error) {
 	// First try FTS5 search
 	result, err := r.searchWithFTS5(ctx, userID, query, filter)
-	
+
 	// If FTS5 fails or returns no results, fall back to LIKE search
 	if err != nil || (result != nil && result.Total == 0) {
 		log.Printf("FTS5 search failed or returned no results (%v), falling back to LIKE search", err)
 		return r.searchWithLike(ctx, userID, query, filter)
 	}
-	
+
 	return result, nil
 }
 
@@ -208,7 +208,7 @@ func (r *EntryRepository) searchWithFTS5(ctx context.Context, userID, query stri
 		Joins("JOIN catalog_entries ON catalog_entries.rowid = fts.rowid").
 		Where("catalog_entries.user_id = ?", userID).
 		Where("entries_fts MATCH ?", query+"*").
-		Order(sortField + " " + sortDir).
+		Order(sortField+" "+sortDir).
 		Offset(offset).
 		Limit(filter.Limit).
 		Pluck("id", &entryIDs).Error
@@ -469,7 +469,7 @@ func (r *EntryRepository) BulkAddTags(ctx context.Context, entryIDs, tagIDs []st
 	if len(entryIDs) == 0 || len(tagIDs) == 0 {
 		return nil
 	}
-	
+
 	var entryTags []model.EntryTag
 	for _, entryID := range entryIDs {
 		for _, tagID := range tagIDs {
@@ -479,7 +479,7 @@ func (r *EntryRepository) BulkAddTags(ctx context.Context, entryIDs, tagIDs []st
 			})
 		}
 	}
-	
+
 	return r.db.WithContext(ctx).Create(&entryTags).Error
 }
 
@@ -488,7 +488,7 @@ func (r *EntryRepository) BulkRemoveTags(ctx context.Context, entryIDs, tagIDs [
 	if len(entryIDs) == 0 || len(tagIDs) == 0 {
 		return nil
 	}
-	
+
 	return r.db.WithContext(ctx).
 		Where("entry_id IN ?", entryIDs).
 		Where("tag_id IN ?", tagIDs).
@@ -500,7 +500,7 @@ func (r *EntryRepository) BulkDelete(ctx context.Context, userID string, entryID
 	if len(entryIDs) == 0 {
 		return nil
 	}
-	
+
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verify ownership for all entries
 		var count int64
@@ -510,26 +510,26 @@ func (r *EntryRepository) BulkDelete(ctx context.Context, userID string, entryID
 			Count(&count).Error; err != nil {
 			return err
 		}
-		
+
 		if count != int64(len(entryIDs)) {
 			return errors.New("one or more entries not found or not owned by user")
 		}
-		
+
 		// Delete entry_tag associations
 		if err := tx.Where("entry_id IN ?", entryIDs).Delete(&model.EntryTag{}).Error; err != nil {
 			return err
 		}
-		
+
 		// Delete interactions
 		if err := tx.Where("entry_id IN ?", entryIDs).Delete(&model.Interaction{}).Error; err != nil {
 			return err
 		}
-		
+
 		// Delete entries
 		if err := tx.Where("id IN ?", entryIDs).Delete(&model.CatalogEntry{}).Error; err != nil {
 			return err
 		}
-		
+
 		return nil
 	})
 }
@@ -683,7 +683,7 @@ func (r *EntryRepository) FindPendingForArchiving(ctx context.Context, limit int
 // GetUserSources returns unique domains/sources from user's entries
 func (r *EntryRepository) GetUserSources(ctx context.Context, userID string) ([]string, error) {
 	var results []string
-	
+
 	// Extract domain from URL using a simple approach
 	rows, err := r.db.WithContext(ctx).
 		Model(&model.CatalogEntry{}).
@@ -708,7 +708,7 @@ func (r *EntryRepository) GetUserSources(ctx context.Context, userID string) ([]
 // GetUserLocations returns unique locations from user's entries
 func (r *EntryRepository) GetUserLocations(ctx context.Context, userID string) ([]string, error) {
 	var results []string
-	
+
 	rows, err := r.db.WithContext(ctx).
 		Model(&model.CatalogEntry{}).
 		Select("DISTINCT location").
@@ -729,6 +729,6 @@ func (r *EntryRepository) GetUserLocations(ctx context.Context, userID string) (
 
 	// Sort alphabetically
 	sort.Strings(results)
-	
+
 	return results, nil
 }

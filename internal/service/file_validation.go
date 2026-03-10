@@ -11,7 +11,7 @@ import (
 
 // Max file sizes
 const (
-	MaxImageSize   = 10 * 1024 * 1024 // 10MB
+	MaxImageSize   = 10 * 1024 * 1024  // 10MB
 	MaxArchiveSize = 100 * 1024 * 1024 // 100MB
 )
 
@@ -24,20 +24,20 @@ var allowedImageMIME = map[string]bool{
 }
 
 var allowedArchiveMIME = map[string]bool{
-	"application/zip":               true,
-	"application/x-zip-compressed":  true,
-	"application/gzip":              true,
-	"application/x-gzip":            true,
+	"application/zip":              true,
+	"application/x-zip-compressed": true,
+	"application/gzip":             true,
+	"application/x-gzip":           true,
 }
 
 // Magic byte signatures for common file types
 var magicBytes = map[string][]byte{
-	"image/jpeg": {0xFF, 0xD8, 0xFF},
-	"image/png":  {0x89, 0x50, 0x4E, 0x47},
-	"image/gif":  {0x47, 0x49, 0x46, 0x38},
-	"image/webp": {0x52, 0x49, 0x46, 0x46}, // RIFF....WEBP
-	"application/zip":               {0x50, 0x4B, 0x03, 0x04},
-	"application/gzip":              {0x1F, 0x8B},
+	"image/jpeg":       {0xFF, 0xD8, 0xFF},
+	"image/png":        {0x89, 0x50, 0x4E, 0x47},
+	"image/gif":        {0x47, 0x49, 0x46, 0x38},
+	"image/webp":       {0x52, 0x49, 0x46, 0x46}, // RIFF....WEBP
+	"application/zip":  {0x50, 0x4B, 0x03, 0x04},
+	"application/gzip": {0x1F, 0x8B},
 }
 
 // FileValidator validates uploaded files

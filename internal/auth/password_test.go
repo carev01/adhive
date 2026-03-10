@@ -6,9 +6,9 @@ import (
 
 func TestHashPassword(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		password string
-		wantErr bool
+		wantErr  bool
 	}{
 		{"valid password", "SecureP@ss1", false},
 		{"short password", "short", false}, // Hash still works, just fails validation

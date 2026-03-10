@@ -4,18 +4,18 @@ import "time"
 
 // ArchiveManifest is the canonical metadata document for a revision bundle.
 type ArchiveManifest struct {
-	SchemaVersion string                 `json:"schema_version"`
-	RevisionID    string                 `json:"revision_id"`
-	EntryID       string                 `json:"entry_id"`
-	RevisionNo    int                    `json:"revision_no"`
-	CapturedAt    time.Time              `json:"captured_at"`
-	Engine        ArchiveEngine          `json:"engine"`
-	BaseURL       string                 `json:"base_url"`
-	Status        ArchiveRevisionStatus  `json:"status"`
-	FailureReason string                 `json:"failure_reason,omitempty"`
-	Stats         ArchiveManifestStats   `json:"stats"`
-	Diagnostics   ArchiveManifestDiag    `json:"diagnostics"`
-	Files         []ArchiveManifestFile  `json:"files"`
+	SchemaVersion string                   `json:"schema_version"`
+	RevisionID    string                   `json:"revision_id"`
+	EntryID       string                   `json:"entry_id"`
+	RevisionNo    int                      `json:"revision_no"`
+	CapturedAt    time.Time                `json:"captured_at"`
+	Engine        ArchiveEngine            `json:"engine"`
+	BaseURL       string                   `json:"base_url"`
+	Status        ArchiveRevisionStatus    `json:"status"`
+	FailureReason string                   `json:"failure_reason,omitempty"`
+	Stats         ArchiveManifestStats     `json:"stats"`
+	Diagnostics   ArchiveManifestDiag      `json:"diagnostics"`
+	Files         []ArchiveManifestFile    `json:"files"`
 	Rewrites      []ArchiveManifestRewrite `json:"rewrites,omitempty"`
 }
 

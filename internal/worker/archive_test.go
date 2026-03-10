@@ -36,9 +36,9 @@ func createMockServer(statusCode int, body string) *httptest.Server {
 func TestArchiveWorker_NewArchiveWorker(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
-	
+
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	if worker == nil {
 		t.Fatal("Expected worker to not be nil")
 	}
@@ -53,12 +53,12 @@ func TestArchiveWorker_NewArchiveWorker(t *testing.T) {
 func TestArchiveWorker_QueueJob(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
-	
+
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	// Queue a job
 	worker.QueueJob("test-entry-id")
-	
+
 	// Give it a moment
 	select {
 	case entryID := <-worker.jobChan:
@@ -73,7 +73,7 @@ func TestArchiveWorker_QueueJob(t *testing.T) {
 func TestArchiveWorker_QueueJob_FullQueue(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
-	
+
 	// Create worker with small channel
 	worker := &ArchiveWorker{
 		entryRepo: entryRepo,
@@ -82,11 +82,11 @@ func TestArchiveWorker_QueueJob_FullQueue(t *testing.T) {
 		stopChan:  make(chan struct{}),
 		logger:    logging.Default(),
 	}
-	
+
 	// Fill the queue
 	worker.QueueJob("job-1")
 	worker.QueueJob("job-2") // This should be dropped
-	
+
 	// First job should be there
 	select {
 	case id := <-worker.jobChan:
@@ -125,14 +125,14 @@ func TestArchiveWorker_Stop_Idempotent(t *testing.T) {
 func TestFetchURL(t *testing.T) {
 	server := createMockServer(200, "<html>Test Page</html>")
 	defer server.Close()
-	
+
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	ctx := context.Background()
 	html, status, err := worker.fetchURL(ctx, server.URL)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -147,14 +147,14 @@ func TestFetchURL(t *testing.T) {
 func TestFetchURL_404(t *testing.T) {
 	server := createMockServer(404, "Not Found")
 	defer server.Close()
-	
+
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	ctx := context.Background()
 	html, status, err := worker.fetchURL(ctx, server.URL)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -170,10 +170,10 @@ func TestFetchURL_InvalidURL(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	ctx := context.Background()
 	_, _, err := worker.fetchURL(ctx, "://invalid-url")
-	
+
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
@@ -183,7 +183,7 @@ func TestGenerateFilename(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	tests := []struct {
 		url      string
 		expected string
@@ -192,7 +192,7 @@ func TestGenerateFilename(t *testing.T) {
 		{"https://example.com/path/to/page?param=value", "example.com_path_to_page_param_value"},
 		{"http://localhost:8080/test", "localhost_8080_test"},
 	}
-	
+
 	for _, tt := range tests {
 		result := worker.generateFilename(tt.url)
 		if len(result) == 0 {
@@ -215,33 +215,33 @@ func TestSaveToDisk(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, tempDir)
-	
+
 	entry := &model.CatalogEntry{
 		ID:     "test-save",
 		UserID: "test-user",
 		URL:    "https://example.com/test",
 	}
-	
+
 	html := "<html>Saved Content</html>"
 	archivePath, err := worker.saveToDisk(context.Background(), entry, html)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 	if archivePath == "" {
 		t.Error("Expected non-empty archive path")
 	}
-	
+
 	// Verify file was created
 	_, err = os.Stat(archivePath)
 	if os.IsNotExist(err) {
 		t.Error("Expected archive file to exist")
 	}
-	
+
 	// Verify content
 	content, _ := os.ReadFile(archivePath)
 	if string(content) != html {
@@ -255,23 +255,23 @@ func TestSaveToDisk_CreateDir(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, tempDir)
-	
+
 	entry := &model.CatalogEntry{
 		ID:     "test-dir",
 		UserID: "user123",
 		URL:    "https://example.com/dir",
 	}
-	
+
 	_, err = worker.saveToDisk(context.Background(), entry, "content")
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	
+
 	// Verify directory was created
 	expectedDir := filepath.Join(tempDir, "archives", "user123")
 	_, err = os.Stat(expectedDir)
@@ -284,19 +284,19 @@ func TestMarkFailed(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	entry := &model.CatalogEntry{
 		ID:            "test-fail",
 		UserID:        "test-user",
 		URL:           "https://example.com/fail",
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
-	
+
 	// Save entry first
 	_ = entryRepo.Create(context.Background(), entry)
-	
+
 	worker.markFailed(context.Background(), entry, "test error")
-	
+
 	// Reload entry
 	reloaded, _ := entryRepo.GetByID(context.Background(), "test-fail")
 	if reloaded.ArchiveStatus != model.ArchiveStatusFailed {
@@ -308,7 +308,7 @@ func TestProcessJob_NotFound(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	// Should not panic
 	worker.processJob(context.Background(), "nonexistent-entry")
 }
@@ -319,14 +319,14 @@ func TestProcessJob_Success(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	server := createMockServer(200, "<html>Test Content</html>")
 	defer server.Close()
-	
+
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, tempDir)
-	
+
 	// Create entry
 	entry := &model.CatalogEntry{
 		ID:            "test-process",
@@ -335,9 +335,9 @@ func TestProcessJob_Success(t *testing.T) {
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
 	_ = entryRepo.Create(context.Background(), entry)
-	
+
 	worker.processJob(context.Background(), "test-process")
-	
+
 	// Reload entry
 	reloaded, _ := entryRepo.GetByID(context.Background(), "test-process")
 	if reloaded.ArchiveStatus != model.ArchiveStatusSuccess {
@@ -352,7 +352,7 @@ func TestProcessJob_FetchError(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	// Create entry with invalid URL
 	entry := &model.CatalogEntry{
 		ID:            "test-error",
@@ -361,23 +361,23 @@ func TestProcessJob_FetchError(t *testing.T) {
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
 	_ = entryRepo.Create(context.Background(), entry)
-	
+
 	// This will fail due to invalid URL, but shouldn't panic
 	// Using a context with timeout to prevent long waits
 	ctx, cancel := context.WithTimeout(context.Background(), 2)
 	defer cancel()
-	
+
 	worker.processJob(ctx, "test-error")
 }
 
 func TestProcessJob_HttpError(t *testing.T) {
 	server := createMockServer(500, "Server Error")
 	defer server.Close()
-	
+
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	entry := &model.CatalogEntry{
 		ID:            "test-500",
 		UserID:        "500-user",
@@ -385,9 +385,9 @@ func TestProcessJob_HttpError(t *testing.T) {
 		ArchiveStatus: model.ArchiveStatusPending,
 	}
 	_ = entryRepo.Create(context.Background(), entry)
-	
+
 	worker.processJob(context.Background(), "test-500")
-	
+
 	// Reload entry
 	reloaded, _ := entryRepo.GetByID(context.Background(), "test-500")
 	if reloaded.ArchiveStatus != model.ArchiveStatusFailed {
@@ -399,26 +399,26 @@ func TestStartStop(t *testing.T) {
 	db := setupWorkerTestDB(t)
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, "/tmp/test-archives")
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	// Start worker
 	worker.Start(ctx)
-	
+
 	// Give the goroutine time to actually start
 	time.Sleep(20 * time.Millisecond)
-	
+
 	// Give it a moment to start
 	select {
 	case <-worker.stopChan:
 		t.Error("Worker should not have stopped yet")
 	default:
 	}
-	
+
 	// Stop worker - this closes stopChan which triggers ctx cancellation in the worker
 	worker.Stop()
-	
+
 	// Wait for worker to process stop signal
 	time.Sleep(150 * time.Millisecond)
 }
@@ -429,10 +429,10 @@ func TestPollPendingEntries(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	server := createMockServer(200, "<html>Content</html>")
 	defer server.Close()
-	
+
 	// Use unique in-memory DB for this test to avoid pollution from other tests
 	// Using a unique file name ensures isolation
 	db, err := gorm.Open(sqlite.Open("file:test_poll_"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
@@ -440,10 +440,10 @@ func TestPollPendingEntries(t *testing.T) {
 		t.Fatalf("Failed to create test db: %v", err)
 	}
 	_ = db.AutoMigrate(&model.CatalogEntry{})
-	
+
 	entryRepo := repository.NewEntryRepository(db)
 	worker := NewArchiveWorker(entryRepo, tempDir)
-	
+
 	// Create pending entries
 	for i := 0; i < 3; i++ {
 		entry := &model.CatalogEntry{
@@ -454,7 +454,7 @@ func TestPollPendingEntries(t *testing.T) {
 		}
 		_ = entryRepo.Create(context.Background(), entry)
 	}
-	
+
 	// Create already processed entry
 	processed := &model.CatalogEntry{
 		ID:            "processed-1",
@@ -464,10 +464,10 @@ func TestPollPendingEntries(t *testing.T) {
 		ArchivePath:   "/some/path",
 	}
 	_ = entryRepo.Create(context.Background(), processed)
-	
+
 	// Poll for pending
 	worker.queuePendingEntries(context.Background())
-	
+
 	// Should have queued 3 jobs
 	queued := 0
 	for {
@@ -479,7 +479,7 @@ func TestPollPendingEntries(t *testing.T) {
 		}
 	}
 done:
-	
+
 	if queued != 3 {
 		t.Errorf("Expected 3 jobs queued, got %d", queued)
 	}

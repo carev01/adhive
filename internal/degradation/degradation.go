@@ -51,15 +51,15 @@ const (
 
 // Manager manages the operational modes of features.
 type Manager struct {
-	mu      sync.RWMutex
-	modes   map[Feature]Mode
+	mu          sync.RWMutex
+	modes       map[Feature]Mode
 	defaultMode Mode
 }
 
 // NewManager creates a new degradation manager.
 func NewManager() *Manager {
 	return &Manager{
-		modes: make(map[Feature]Mode),
+		modes:       make(map[Feature]Mode),
 		defaultMode: ModeFull,
 	}
 }
@@ -75,7 +75,7 @@ func (m *Manager) SetMode(feature Feature, mode Mode) {
 func (m *Manager) GetMode(feature Feature) Mode {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if mode, ok := m.modes[feature]; ok {
 		return mode
 	}
@@ -99,12 +99,12 @@ func (m *Manager) CanUse(feature Feature) bool {
 // - ModeDisabled: executes fallback only
 func DegradedFallback(ctx context.Context, m *Manager, feature Feature, primary func() error, fallback func() error) error {
 	mode := m.GetMode(feature)
-	
+
 	switch mode {
 	case ModeFull:
 		// Execute primary only, fail fast
 		return primary()
-		
+
 	case ModeDegraded:
 		// Try primary, fall back on failure
 		err := primary()
@@ -116,14 +116,14 @@ func DegradedFallback(ctx context.Context, m *Manager, feature Feature, primary 
 			return err
 		}
 		return nil
-		
+
 	case ModeDisabled:
 		// Execute fallback only
 		if fallback != nil {
 			return fallback()
 		}
 		return errors.New("feature disabled and no fallback available")
-		
+
 	default:
 		// Default to full mode
 		return primary()
@@ -133,11 +133,11 @@ func DegradedFallback(ctx context.Context, m *Manager, feature Feature, primary 
 // DegradedFallbackWithResult is like DegradedFallback but returns a result.
 func DegradedFallbackWithResult(ctx context.Context, m *Manager, feature Feature, primary func() (interface{}, error), fallback func() (interface{}, error)) (interface{}, error) {
 	mode := m.GetMode(feature)
-	
+
 	switch mode {
 	case ModeFull:
 		return primary()
-		
+
 	case ModeDegraded:
 		result, err := primary()
 		if err != nil {
@@ -147,13 +147,13 @@ func DegradedFallbackWithResult(ctx context.Context, m *Manager, feature Feature
 			return nil, err
 		}
 		return result, nil
-		
+
 	case ModeDisabled:
 		if fallback != nil {
 			return fallback()
 		}
 		return nil, errors.New("feature disabled and no fallback available")
-		
+
 	default:
 		return primary()
 	}
@@ -161,12 +161,12 @@ func DegradedFallbackWithResult(ctx context.Context, m *Manager, feature Feature
 
 // CircuitBreaker implements a circuit breaker pattern.
 type CircuitBreaker struct {
-	mu           sync.Mutex
-	maxFailures  int
-	state        CircuitState
-	failures     int
-	resetAfter   time.Duration
-	lastFailure  time.Time
+	mu          sync.Mutex
+	maxFailures int
+	state       CircuitState
+	failures    int
+	resetAfter  time.Duration
+	lastFailure time.Time
 }
 
 // NewCircuitBreaker creates a new circuit breaker.
@@ -183,7 +183,7 @@ func NewCircuitBreaker(maxFailures int, resetAfter time.Duration) *CircuitBreake
 func (cb *CircuitBreaker) Call(fn func() error) error {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	// Check if circuit should transition from open to half-open
 	if cb.state == CircuitOpen {
 		if time.Since(cb.lastFailure) >= cb.resetAfter {
@@ -192,17 +192,17 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 			return ErrCircuitOpen
 		}
 	}
-	
+
 	// Execute the function
 	err := fn()
-	
+
 	// Record the result
 	if err != nil {
 		cb.recordFailure()
 	} else {
 		cb.recordSuccess()
 	}
-	
+
 	return err
 }
 
@@ -210,7 +210,7 @@ func (cb *CircuitBreaker) Call(fn func() error) error {
 func (cb *CircuitBreaker) recordFailure() {
 	cb.failures++
 	cb.lastFailure = time.Now()
-	
+
 	if cb.failures >= cb.maxFailures {
 		cb.state = CircuitOpen
 	}

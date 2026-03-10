@@ -42,10 +42,10 @@ const (
 
 // Authorization error codes.
 const (
-	CodeUnauthorized    ErrorCode = "UNAUTHORIZED"
-	CodeSessionExpired  ErrorCode = "SESSION_EXPIRED"
-	CodeForbidden       ErrorCode = "FORBIDDEN"
-	CodeInvalidToken    ErrorCode = "INVALID_TOKEN"
+	CodeUnauthorized   ErrorCode = "UNAUTHORIZED"
+	CodeSessionExpired ErrorCode = "SESSION_EXPIRED"
+	CodeForbidden      ErrorCode = "FORBIDDEN"
+	CodeInvalidToken   ErrorCode = "INVALID_TOKEN"
 )
 
 // Resource error codes.
@@ -58,14 +58,14 @@ const (
 
 // Conflict error codes.
 const (
-	CodeDuplicateEntry  ErrorCode = "DUPLICATE_ENTRY"
-	CodeDuplicateTag    ErrorCode = "DUPLICATE_TAG"
-	CodeDuplicateUser   ErrorCode = "DUPLICATE_USER"
+	CodeDuplicateEntry ErrorCode = "DUPLICATE_ENTRY"
+	CodeDuplicateTag   ErrorCode = "DUPLICATE_TAG"
+	CodeDuplicateUser  ErrorCode = "DUPLICATE_USER"
 )
 
 // External service error codes.
 const (
-	CodePlaywrightFailed  ErrorCode = "PLAYWRIGHT_FAILED"
+	CodePlaywrightFailed ErrorCode = "PLAYWRIGHT_FAILED"
 	CodeArchiveFailed    ErrorCode = "ARCHIVE_FAILED"
 	CodeThumbnailFailed  ErrorCode = "THUMBNAIL_FAILED"
 	CodeExternalService  ErrorCode = "EXTERNAL_SERVICE_ERROR"
@@ -73,10 +73,10 @@ const (
 
 // Transient error codes (retryable).
 const (
-	CodeDatabaseBusy       ErrorCode = "DATABASE_BUSY"
-	CodeRateLimited       ErrorCode = "RATE_LIMITED"
-	CodeTimeout           ErrorCode = "TIMEOUT"
-	CodeTemporaryFailure  ErrorCode = "TEMPORARY_FAILURE"
+	CodeDatabaseBusy     ErrorCode = "DATABASE_BUSY"
+	CodeRateLimited      ErrorCode = "RATE_LIMITED"
+	CodeTimeout          ErrorCode = "TIMEOUT"
+	CodeTemporaryFailure ErrorCode = "TEMPORARY_FAILURE"
 )
 
 // Internal error codes.
@@ -86,12 +86,12 @@ const (
 
 // AppError represents an application error with structured information.
 type AppError struct {
-	Code       ErrorCode             `json:"code"`
-	Category   ErrorCategory         `json:"category"`
-	Message    string                `json:"message"`
-	Cause      error                 `json:"-"`
-	HTTPStatus int                   `json:"-"`
-	Retryable  bool                  `json:"retryable"`
+	Code       ErrorCode              `json:"code"`
+	Category   ErrorCategory          `json:"category"`
+	Message    string                 `json:"message"`
+	Cause      error                  `json:"-"`
+	HTTPStatus int                    `json:"-"`
+	Retryable  bool                   `json:"retryable"`
 	Context    map[string]interface{} `json:"context,omitempty"`
 }
 

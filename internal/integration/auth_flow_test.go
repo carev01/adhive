@@ -19,7 +19,7 @@ import (
 
 // TestDatabase holds the test DB and repos for integration tests
 type TestDatabase struct {
-	DB         *gorm.DB
+	DB          *gorm.DB
 	UserRepo    *repository.UserRepository
 	SessionRepo *repository.SessionRepository
 }
@@ -32,7 +32,7 @@ func setupIntegrationDB(t *testing.T) *TestDatabase {
 	_ = db.AutoMigrate(&model.User{}, &model.Session{})
 
 	return &TestDatabase{
-		DB:         db,
+		DB:          db,
 		UserRepo:    repository.NewUserRepository(db),
 		SessionRepo: repository.NewSessionRepository(db),
 	}
@@ -77,7 +77,7 @@ func TestFullAuthFlow(t *testing.T) {
 	// Step 1: Register a new user
 	registerPayload := handler.RegisterRequest{
 		Email:       "flowtest@example.com",
-		Password:   "SecureP@ss1",
+		Password:    "SecureP@ss1",
 		DisplayName: "Flow Test User",
 	}
 	registerBody, _ := json.Marshal(registerPayload)

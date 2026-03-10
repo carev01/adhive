@@ -30,26 +30,26 @@ import (
 
 // ArchiveWorker handles background archiving of URLs
 type ArchiveWorker struct {
-	entryRepo               *repository.EntryRepository
-	archiveRevisionRepo     *repository.ArchiveRevisionRepository
-	archiveAssetRepo        *repository.ArchiveAssetRepository
-	thumbnailCandidateRepo  *repository.ThumbnailCandidateRepository
-	httpClient              *http.Client
-	dataDir                 string
-	jobChan                 chan string
-	stopChan                chan struct{}
-	metadataExtractor       *service.MetadataExtractor
-	thumbnailService        *service.ThumbnailService
-	playwrightService       *service.PlaywrightService
-	archiveBundler          *service.ArchiveBundler
-	retentionLimit          int
-	usePlaywright           bool
-	manualCaptureRequests   sync.Map // entryID -> bool
-	processing              map[string]struct{}
-	stopped                 atomic.Bool
-	stopOnce                sync.Once
-	logger                  *logging.Logger
-	degradationManager      *degradation.Manager
+	entryRepo                *repository.EntryRepository
+	archiveRevisionRepo      *repository.ArchiveRevisionRepository
+	archiveAssetRepo         *repository.ArchiveAssetRepository
+	thumbnailCandidateRepo   *repository.ThumbnailCandidateRepository
+	httpClient               *http.Client
+	dataDir                  string
+	jobChan                  chan string
+	stopChan                 chan struct{}
+	metadataExtractor        *service.MetadataExtractor
+	thumbnailService         *service.ThumbnailService
+	playwrightService        *service.PlaywrightService
+	archiveBundler           *service.ArchiveBundler
+	retentionLimit           int
+	usePlaywright            bool
+	manualCaptureRequests    sync.Map // entryID -> bool
+	processing               map[string]struct{}
+	stopped                  atomic.Bool
+	stopOnce                 sync.Once
+	logger                   *logging.Logger
+	degradationManager       *degradation.Manager
 	playwrightCircuitBreaker *degradation.CircuitBreaker
 }
 
@@ -78,7 +78,7 @@ func NewArchiveWorker(entryRepo *repository.EntryRepository, dataDir string) *Ar
 		archiveBundler:           archiveBundler,
 		retentionLimit:           3,
 		usePlaywright:            playwrightService.IsAvailable(),
-		processing:              make(map[string]struct{}),
+		processing:               make(map[string]struct{}),
 		logger:                   logging.Default(),
 		degradationManager:       degradationManager,
 		playwrightCircuitBreaker: degradation.NewCircuitBreaker(5, 30*time.Second),
@@ -507,7 +507,7 @@ func (w *ArchiveWorker) fetchURL(ctx context.Context, url string) (string, int, 
 }
 
 // saveToDisk saves the HTML content to disk
-func (w *ArchiveWorker) saveToDisk(ctx context.Context, entry *model.CatalogEntry, html string) (string, error) {
+func (w *ArchiveWorker) saveToDisk(_ context.Context, entry *model.CatalogEntry, html string) (string, error) {
 	// Create archive directory (entry.ID canonical)
 	archiveDir := filepath.Join(w.dataDir, "archives", entry.ID)
 	if err := os.MkdirAll(archiveDir, 0755); err != nil {
@@ -617,7 +617,7 @@ func (w *ArchiveWorker) queuePendingEntries(ctx context.Context) {
 		if entry.ArchiveStatus == model.ArchiveStatusSuccess && entry.ArchivePath != "" {
 			continue
 		}
-		
+
 		if entry.ArchiveStatus == model.ArchiveStatusPending && entry.ArchivePath == "" {
 			// Skip if already being processed in this worker instance
 			if _, inProc := w.processing[entry.ID]; inProc {

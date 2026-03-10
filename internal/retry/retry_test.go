@@ -44,14 +44,14 @@ func TestArchiveConfig(t *testing.T) {
 func TestDo_SuccessOnFirstAttempt(t *testing.T) {
 	callCount := 0
 	cfg := DefaultConfig()
-	
+
 	fn := func() error {
 		callCount++
 		return nil
 	}
-	
+
 	err := Do(context.Background(), cfg, func(error) bool { return true }, fn)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -69,7 +69,7 @@ func TestDo_SuccessAfterRetries(t *testing.T) {
 		Multiplier:   2.0,
 		Jitter:       0,
 	}
-	
+
 	fn := func() error {
 		callCount++
 		if callCount < 3 {
@@ -77,9 +77,9 @@ func TestDo_SuccessAfterRetries(t *testing.T) {
 		}
 		return nil
 	}
-	
+
 	err := Do(context.Background(), cfg, func(error) bool { return true }, fn)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error after retries, got %v", err)
 	}
@@ -92,19 +92,19 @@ func TestDo_MaxAttemptsExceeded(t *testing.T) {
 	callCount := 0
 	cfg := Config{
 		MaxAttempts:  3,
-		InitialDelay:  1 * time.Millisecond,
-		MaxDelay:      10 * time.Millisecond,
-		Multiplier:    2.0,
-		Jitter:        0,
+		InitialDelay: 1 * time.Millisecond,
+		MaxDelay:     10 * time.Millisecond,
+		Multiplier:   2.0,
+		Jitter:       0,
 	}
-	
+
 	fn := func() error {
 		callCount++
 		return errors.New("persistent error")
 	}
-	
+
 	err := Do(context.Background(), cfg, func(error) bool { return true }, fn)
-	
+
 	if err == nil {
 		t.Error("Expected error after max attempts")
 	}
@@ -122,15 +122,15 @@ func TestDo_NonRetryableError(t *testing.T) {
 		Multiplier:   2.0,
 		Jitter:       0,
 	}
-	
+
 	fn := func() error {
 		callCount++
 		return errors.New("non-retryable error")
 	}
-	
+
 	// Only retry transient errors - this one is not retryable
 	err := Do(context.Background(), cfg, func(e error) bool { return false }, fn)
-	
+
 	if err == nil {
 		t.Error("Expected error")
 	}
@@ -149,22 +149,22 @@ func TestDo_ContextCancellation(t *testing.T) {
 		Multiplier:   2.0,
 		Jitter:       0,
 	}
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	fn := func() error {
 		callCount++
 		return errors.New("error")
 	}
-	
+
 	// Cancel context after first call
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		cancel()
 	}()
-	
+
 	err := Do(ctx, cfg, func(error) bool { return true }, fn)
-	
+
 	// Should return context cancellation error
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled error, got %v", err)
@@ -178,14 +178,14 @@ func TestDo_ContextCancellation(t *testing.T) {
 func TestDoWithResult_Success(t *testing.T) {
 	callCount := 0
 	cfg := DefaultConfig()
-	
+
 	fn := func() (interface{}, error) {
 		callCount++
 		return "success", nil
 	}
-	
+
 	result, err := DoWithResult(context.Background(), cfg, func(error) bool { return true }, fn)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -206,7 +206,7 @@ func TestDoWithResult_SuccessAfterRetries(t *testing.T) {
 		Multiplier:   2.0,
 		Jitter:       0,
 	}
-	
+
 	fn := func() (interface{}, error) {
 		callCount++
 		if callCount < 2 {
@@ -214,9 +214,9 @@ func TestDoWithResult_SuccessAfterRetries(t *testing.T) {
 		}
 		return "result", nil
 	}
-	
+
 	result, err := DoWithResult(context.Background(), cfg, func(error) bool { return true }, fn)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -230,13 +230,13 @@ func TestDoWithResult_SuccessAfterRetries(t *testing.T) {
 
 func TestDoWithResult_Error(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	fn := func() (interface{}, error) {
 		return nil, errors.New("error")
 	}
-	
+
 	result, err := DoWithResult(context.Background(), cfg, func(error) bool { return false }, fn)
-	
+
 	if err == nil {
 		t.Error("Expected error")
 	}
@@ -268,9 +268,9 @@ func TestCalculateDelay(t *testing.T) {
 	for _, tt := range tests {
 		delay := calculateDelay(tt.attempt, cfg)
 		ms := delay.Milliseconds()
-		
+
 		if int(ms) < tt.minExpectedMs || int(ms) > tt.maxExpectedMs {
-			t.Errorf("Attempt %d: delay = %dms, want %d-%dms", 
+			t.Errorf("Attempt %d: delay = %dms, want %d-%dms",
 				tt.attempt, ms, tt.minExpectedMs, tt.maxExpectedMs)
 		}
 	}
@@ -300,7 +300,7 @@ func TestCalculateDelay_WithJitter(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if allSame {
 		t.Error("Jitter should produce different delays, but all were the same")
 	}
@@ -323,7 +323,7 @@ func TestCalculateDelay_MaxDelayCap(t *testing.T) {
 
 	// Even with large multiplier, delay should be capped
 	delay := calculateDelay(5, cfg)
-	
+
 	if delay > 550*time.Millisecond { // Small tolerance
 		t.Errorf("Delay = %v, should be capped at ~500ms", delay)
 	}

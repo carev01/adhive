@@ -41,20 +41,20 @@ var ErrorCodeRegistry = map[apperrors.ErrorCode]int{
 
 	// Conflict errors (409)
 	apperrors.CodeDuplicateEntry: http.StatusConflict,
-	apperrors.CodeDuplicateTag:    http.StatusConflict,
-	apperrors.CodeDuplicateUser:   http.StatusConflict,
+	apperrors.CodeDuplicateTag:   http.StatusConflict,
+	apperrors.CodeDuplicateUser:  http.StatusConflict,
 
 	// External service errors (502)
 	apperrors.CodePlaywrightFailed: http.StatusBadGateway,
-	apperrors.CodeArchiveFailed:     http.StatusBadGateway,
+	apperrors.CodeArchiveFailed:    http.StatusBadGateway,
 	apperrors.CodeThumbnailFailed:  http.StatusBadGateway,
 	apperrors.CodeExternalService:  http.StatusBadGateway,
 
 	// Transient errors (503)
-	apperrors.CodeDatabaseBusy:       http.StatusServiceUnavailable,
-	apperrors.CodeRateLimited:        http.StatusTooManyRequests,
-	apperrors.CodeTimeout:             http.StatusGatewayTimeout,
-	apperrors.CodeTemporaryFailure:    http.StatusServiceUnavailable,
+	apperrors.CodeDatabaseBusy:     http.StatusServiceUnavailable,
+	apperrors.CodeRateLimited:      http.StatusTooManyRequests,
+	apperrors.CodeTimeout:          http.StatusGatewayTimeout,
+	apperrors.CodeTemporaryFailure: http.StatusServiceUnavailable,
 
 	// Internal errors (500) - default for unknown
 }

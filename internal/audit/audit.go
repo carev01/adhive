@@ -14,10 +14,10 @@ import (
 type EventType string
 
 const (
-	EventTypeAuth    EventType = "auth"
-	EventTypeSession EventType = "session"
-	EventTypeEntry   EventType = "entry"
-	EventTypeArchive EventType = "archive"
+	EventTypeAuth     EventType = "auth"
+	EventTypeSession  EventType = "session"
+	EventTypeEntry    EventType = "entry"
+	EventTypeArchive  EventType = "archive"
 	EventTypeSecurity EventType = "security"
 )
 
@@ -39,25 +39,25 @@ const (
 
 // Event represents a single audit event
 type Event struct {
-	Timestamp   time.Time   `json:"timestamp"`
-	Type        EventType   `json:"type"`
-	Action      Action      `json:"action"`
-	UserID      string      `json:"user_id,omitempty"`
-	Email       string      `json:"email,omitempty"`
-	IPAddress   string      `json:"ip_address"`
-	UserAgent   string      `json:"user_agent,omitempty"`
-	ResourceID  string      `json:"resource_id,omitempty"`
-	ResourceType string    `json:"resource_type,omitempty"`
-	Success     bool        `json:"success"`
-	Detail      string      `json:"detail,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp    time.Time              `json:"timestamp"`
+	Type         EventType              `json:"type"`
+	Action       Action                 `json:"action"`
+	UserID       string                 `json:"user_id,omitempty"`
+	Email        string                 `json:"email,omitempty"`
+	IPAddress    string                 `json:"ip_address"`
+	UserAgent    string                 `json:"user_agent,omitempty"`
+	ResourceID   string                 `json:"resource_id,omitempty"`
+	ResourceType string                 `json:"resource_type,omitempty"`
+	Success      bool                   `json:"success"`
+	Detail       string                 `json:"detail,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Logger handles audit event logging
 type Logger struct {
-	output   io.Writer
-	mu       sync.Mutex
-	enabled  bool
+	output  io.Writer
+	mu      sync.Mutex
+	enabled bool
 }
 
 // DefaultLogger is the default audit logger
@@ -90,14 +90,14 @@ func (l *Logger) Log(event Event) {
 	}
 
 	event.Timestamp = time.Now().UTC()
-	
+
 	// Encode as JSON
 	data, err := json.Marshal(event)
 	if err != nil {
 		log.Printf("audit: failed to marshal event: %v", err)
 		return
 	}
-	
+
 	// Write to output
 	fmt.Fprintln(l.output, string(data))
 }
@@ -110,27 +110,27 @@ func Log(event Event) {
 // AuthSuccess logs a successful authentication event
 func AuthSuccess(action Action, userID, email, ip, userAgent string) {
 	Log(Event{
-		Type:       EventTypeAuth,
-		Action:     action,
-		UserID:     userID,
-		Email:      email,
-		IPAddress:  ip,
-		UserAgent:  userAgent,
-		Success:    true,
-		Detail:     fmt.Sprintf("%s successful", action),
+		Type:      EventTypeAuth,
+		Action:    action,
+		UserID:    userID,
+		Email:     email,
+		IPAddress: ip,
+		UserAgent: userAgent,
+		Success:   true,
+		Detail:    fmt.Sprintf("%s successful", action),
 	})
 }
 
 // AuthFailure logs a failed authentication event
 func AuthFailure(action Action, email, ip, userAgent, detail string) {
 	Log(Event{
-		Type:       EventTypeAuth,
-		Action:     ActionAuthFail,
-		Email:      email,
-		IPAddress:  ip,
-		UserAgent:  userAgent,
-		Success:    false,
-		Detail:     detail,
+		Type:      EventTypeAuth,
+		Action:    ActionAuthFail,
+		Email:     email,
+		IPAddress: ip,
+		UserAgent: userAgent,
+		Success:   false,
+		Detail:    detail,
 	})
 }
 

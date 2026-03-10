@@ -44,7 +44,7 @@ func TestErrorResponse(t *testing.T) {
 
 func TestErrorCodeRegistry(t *testing.T) {
 	tests := []struct {
-		code      apperrors.ErrorCode
+		code       apperrors.ErrorCode
 		wantStatus int
 	}{
 		{apperrors.CodeInvalidInput, http.StatusBadRequest},

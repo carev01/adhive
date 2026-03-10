@@ -21,12 +21,12 @@ import (
 // TestDatabaseWithEntries extends TestDatabase for entry/tag tests
 type TestDatabaseWithEntries struct {
 	DB          *gorm.DB
-	UserRepo     *repository.UserRepository
-	SessionRepo  *repository.SessionRepository
-	EntryRepo    *repository.EntryRepository
-	TagRepo      *repository.TagRepository
-	TestUserID   string
-	TestUser2ID  string
+	UserRepo    *repository.UserRepository
+	SessionRepo *repository.SessionRepository
+	EntryRepo   *repository.EntryRepository
+	TagRepo     *repository.TagRepository
+	TestUserID  string
+	TestUser2ID string
 }
 
 func setupTestDB(t *testing.T) *TestDatabaseWithEntries {
@@ -34,7 +34,7 @@ func setupTestDB(t *testing.T) *TestDatabaseWithEntries {
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}
-	db.AutoMigrate(
+	_ = db.AutoMigrate(
 		&model.User{}, &model.Session{}, &model.CatalogEntry{},
 		&model.Tag{}, &model.EntryTag{},
 		&model.ArchiveRevision{}, &model.ArchiveAsset{},
@@ -42,11 +42,11 @@ func setupTestDB(t *testing.T) *TestDatabaseWithEntries {
 	)
 
 	return &TestDatabaseWithEntries{
-		DB:         db,
+		DB:          db,
 		UserRepo:    repository.NewUserRepository(db),
 		SessionRepo: repository.NewSessionRepository(db),
-		EntryRepo:  repository.NewEntryRepository(db),
-		TagRepo:    repository.NewTagRepository(db),
+		EntryRepo:   repository.NewEntryRepository(db),
+		TagRepo:     repository.NewTagRepository(db),
 	}
 }
 
@@ -96,7 +96,7 @@ func createTestUser(td *TestDatabaseWithEntries, email string) string {
 		DisplayName:  email,
 		IsActive:     true,
 	}
-	td.UserRepo.Create(user)
+	_ = td.UserRepo.Create(user)
 
 	// Create session
 	session := &model.Session{
@@ -284,7 +284,7 @@ func TestEntry_List(t *testing.T) {
 	}
 
 	var resp handler.EntryListResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Total != 2 {
 		t.Errorf("Expected 2 entries, got %d", resp.Total)
@@ -592,7 +592,7 @@ func TestTag_Create(t *testing.T) {
 	}
 
 	var resp handler.TagResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Name != "TestTag" {
 		t.Errorf("Expected name 'TestTag', got %s", resp.Name)
@@ -624,7 +624,7 @@ func TestTag_Create_DefaultColor(t *testing.T) {
 	}
 
 	var resp handler.TagResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 	if resp.Color != "#6B7280" {
 		t.Errorf("Expected default color #6B7280, got %s", resp.Color)
@@ -946,4 +946,3 @@ func TestTag_RemoveEntryTag(t *testing.T) {
 }
 
 // ============ Entry Search Tests ============
-

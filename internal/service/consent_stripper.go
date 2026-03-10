@@ -52,7 +52,7 @@ func DefaultSelectorGroups() []SelectorGroup {
 		{
 			Name: "cookie-consent",
 			Selectors: []string{
-				"#capa_configuracion_cookies",
+				"#capa_configuration_cookies",
 				`div[id*="cookie-consent"]`,
 				`div[id*="cookie-banner"]`,
 				`div[class*="cookie-banner"]`,

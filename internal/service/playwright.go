@@ -17,9 +17,9 @@ type PlaywrightConfig struct {
 	BrowserType         string // "chromium", "firefox", "webkit"
 	Headless            bool
 	Timeout             time.Duration
-	UserAgent           string // optional — leave empty to use JS scraper's auto-detected default
-	ViewportWidth       int    // optional — 0 lets JS scraper pick from realistic resolution pool
-	ViewportHeight      int    // optional — 0 lets JS scraper pick from realistic resolution pool
+	UserAgent           string   // optional — leave empty to use JS scraper's auto-detected default
+	ViewportWidth       int      // optional — 0 lets JS scraper pick from realistic resolution pool
+	ViewportHeight      int      // optional — 0 lets JS scraper pick from realistic resolution pool
 	HumanDomains        []string // domains requiring interactive/manual capture mode
 	EnableManualCapture bool
 }
@@ -57,23 +57,23 @@ func DefaultPlaywrightConfig() PlaywrightConfig {
 
 // PlaywrightResult holds the result of a Playwright scrape
 type PlaywrightResult struct {
-	HTML              string             `json:"html"`
-	StatusCode        int                `json:"status_code"`
-	Screenshot        string             `json:"screenshot,omitempty"`
-	Error             string             `json:"error,omitempty"`
-	Headers           map[string]string  `json:"headers,omitempty"`
-	FinalURL          string             `json:"final_url,omitempty"`
-	ResourceURLs      []string           `json:"resource_urls,omitempty"`
-	DOMAssetURLs      []string           `json:"dom_asset_urls,omitempty"`
-	Cookies           []PlaywrightCookie `json:"cookies,omitempty"`
-	RedirectChain     []string           `json:"redirect_chain,omitempty"`
-	ChallengeDetected    bool     `json:"challenge_detected,omitempty"`
-	ChallengeSignals     []string `json:"challenge_signals,omitempty"`
-	CrossDomainRedirect  bool     `json:"cross_domain_redirect,omitempty"`
-	SocialMediaRedirect  bool     `json:"social_media_redirect,omitempty"`
-	CaptureMode       string             `json:"capture_mode,omitempty"` // auto | manual
-	TimeoutStage      string             `json:"timeout_stage,omitempty"`
-	ErrorType         string             `json:"error_type,omitempty"`
+	HTML                string             `json:"html"`
+	StatusCode          int                `json:"status_code"`
+	Screenshot          string             `json:"screenshot,omitempty"`
+	Error               string             `json:"error,omitempty"`
+	Headers             map[string]string  `json:"headers,omitempty"`
+	FinalURL            string             `json:"final_url,omitempty"`
+	ResourceURLs        []string           `json:"resource_urls,omitempty"`
+	DOMAssetURLs        []string           `json:"dom_asset_urls,omitempty"`
+	Cookies             []PlaywrightCookie `json:"cookies,omitempty"`
+	RedirectChain       []string           `json:"redirect_chain,omitempty"`
+	ChallengeDetected   bool               `json:"challenge_detected,omitempty"`
+	ChallengeSignals    []string           `json:"challenge_signals,omitempty"`
+	CrossDomainRedirect bool               `json:"cross_domain_redirect,omitempty"`
+	SocialMediaRedirect bool               `json:"social_media_redirect,omitempty"`
+	CaptureMode         string             `json:"capture_mode,omitempty"` // auto | manual
+	TimeoutStage        string             `json:"timeout_stage,omitempty"`
+	ErrorType           string             `json:"error_type,omitempty"`
 }
 
 // PlaywrightCookie is a serializable cookie exported from Playwright context.
@@ -108,10 +108,10 @@ func (s *PlaywrightService) Scrape(ctx context.Context, url string, options map[
 	// Omitted fields let the JS scraper use its own defaults (derived from
 	// the bundled Chromium version), avoiding version mismatches.
 	config := map[string]interface{}{
-		"url":     url,
-		"browser": s.config.BrowserType,
+		"url":      url,
+		"browser":  s.config.BrowserType,
 		"headless": s.config.Headless,
-		"timeout": s.config.Timeout.Milliseconds(),
+		"timeout":  s.config.Timeout.Milliseconds(),
 	}
 	if s.config.UserAgent != "" {
 		config["userAgent"] = s.config.UserAgent
@@ -272,5 +272,3 @@ func (s *PlaywrightService) InstallBrowsers() error {
 
 	return nil
 }
-
-

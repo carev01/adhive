@@ -137,10 +137,10 @@ func (h *TagHandler) Create(c *gin.Context) {
 	}
 
 	tag := &model.Tag{
-		ID:    uuid.New().String(),
+		ID:     uuid.New().String(),
 		UserID: userID,
-		Name:  req.Name,
-		Color: req.Color,
+		Name:   req.Name,
+		Color:  req.Color,
 	}
 
 	err := h.tagRepo.Create(tag)

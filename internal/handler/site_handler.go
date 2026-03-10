@@ -40,8 +40,8 @@ type SiteSelectors struct {
 
 // HandlerRegistry manages all registered site handlers
 type HandlerRegistry struct {
-	handlers  []SiteHandler
-	fallback  SiteHandler
+	handlers []SiteHandler
+	fallback SiteHandler
 }
 
 // NewHandlerRegistry creates a new handler registry with default handlers
@@ -75,8 +75,8 @@ func (r *HandlerRegistry) GetHandler(rawURL string) SiteHandler {
 // GenericHandler is the default handler for unknown sites
 type GenericHandler struct{}
 
-func (h *GenericHandler) Name() string { return "generic" }
-func (h *GenericHandler) Domains() []string { return nil }
+func (h *GenericHandler) Name() string              { return "generic" }
+func (h *GenericHandler) Domains() []string         { return nil }
 func (h *GenericHandler) CanHandle(url string) bool { return true }
 func (h *GenericHandler) Selectors() *SiteSelectors {
 	return &SiteSelectors{

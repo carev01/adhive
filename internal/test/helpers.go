@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 
@@ -27,49 +28,28 @@ func Router() *gin.Engine {
 // MockRequest creates a test HTTP request
 func MockRequest(method, path string, body interface{}) *http.Request {
 	var bodyBytes []byte
+	var err error
 	if body != nil {
-		bodyBytes, _ = json.Marshal(body)
+		bodyBytes, err = json.Marshal(body)
+		if err != nil {
+			// In test context, panic or log - for now we'll return nil request
+			// but better to handle properly
+			panic(fmt.Errorf("failed to marshal request body: %w", err))
+		}
 	}
 	req := httptest.NewRequest(method, path, bytes.NewBuffer(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	return req
 }
 
-// ResponseRecorder wraps httptest.ResponseRecorder for chaining
-type ResponseRecorder struct {
-	*httptest.ResponseRecorder
+// GetBody returns the body bytes from a ResponseRecorder
+func GetBody(rec *httptest.ResponseRecorder) []byte {
+	return rec.Body.Bytes()
 }
 
-func NewRecorder() *ResponseRecorder {
-	return &ResponseRecorder{
-		ResponseRecorder: httptest.NewRecorder(),
-	}
-}
-
-// Bind binds the response body to a struct
-func (r *ResponseRecorder) Bind(v interface{}) error {
-	return json.Unmarshal(r.Body.Bytes(), v)
-}
-
-// AssertStatus checks if the status code matches
-func (r *ResponseRecorder) AssertStatus(t TestingT, expected int) {
-	if r.Code != expected {
-		t.Errorf("expected status %d, got %d. Body: %s", expected, r.Code, r.Body.String())
-	}
-}
-
-// AssertJSON checks if the response contains expected JSON
-func (r *ResponseRecorder) AssertJSON(t TestingT, expected string) {
-	var expectedJSON, actualJSON map[string]interface{}
-	_ = json.Unmarshal([]byte(expected), &expectedJSON)
-	_ = json.Unmarshal(r.Body.Bytes(), &actualJSON)
-
-	// Simple comparison - just check keys exist
-	for key := range expectedJSON {
-		if _, ok := actualJSON[key]; !ok {
-			t.Errorf("expected key '%s' in response", key)
-		}
-	}
+// GetCode returns the status code from a ResponseRecorder
+func GetCode(rec *httptest.ResponseRecorder) int {
+	return rec.Code
 }
 
 // TestingT is an interface for test helpers

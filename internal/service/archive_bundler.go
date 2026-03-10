@@ -23,11 +23,11 @@ import (
 
 // ArchiveBundler persists revision-oriented archive bundles and manifest metadata.
 type ArchiveBundler struct {
-	baseDir       	string
-	maxAssetBytes 	int64
-	maxTotalBytes 	int64
-	httpClient    	*http.Client
-	consentStripper *ConsentStripper 
+	baseDir         string
+	maxAssetBytes   int64
+	maxTotalBytes   int64
+	httpClient      *http.Client
+	consentStripper *ConsentStripper
 }
 
 func (b *ArchiveBundler) withCaptureCookies(req *http.Request, capture *PlaywrightResult, targetURL string) {
@@ -83,23 +83,23 @@ func (b *ArchiveBundler) withCaptureCookies(req *http.Request, capture *Playwrig
 }
 
 func NewArchiveBundler(baseDir string) (*ArchiveBundler, error) {
-    stripper, err := NewConsentStripper(DefaultSelectorGroups())
-    if err != nil {
-        return nil, fmt.Errorf("init consent stripper: %w", err)
-    }
+	stripper, err := NewConsentStripper(DefaultSelectorGroups())
+	if err != nil {
+		return nil, fmt.Errorf("init consent stripper: %w", err)
+	}
 
-    return &ArchiveBundler{
-        baseDir:       baseDir,
-        maxAssetBytes: 8 * 1024 * 1024,
-        maxTotalBytes: 64 * 1024 * 1024,
-        httpClient: &http.Client{
-            Timeout: 15 * time.Second,
-            CheckRedirect: func(req *http.Request, via []*http.Request) error {
-                return http.ErrUseLastResponse
-            },
-        },
-        consentStripper: stripper,
-    }, nil
+	return &ArchiveBundler{
+		baseDir:       baseDir,
+		maxAssetBytes: 8 * 1024 * 1024,
+		maxTotalBytes: 64 * 1024 * 1024,
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+		consentStripper: stripper,
+	}, nil
 }
 
 // BundleInput is the data needed to build a new archive revision bundle.
@@ -382,7 +382,7 @@ func (b *ArchiveBundler) persistAssetFromURL(ctx context.Context, rawURL, assets
 	// Only attempt detection when the server gave us nothing useful
 	if baseMime == "" || baseMime == "application/octet-stream" {
 		if detected := detectMimeFromExt(ext); detected != "" {
-			mime = detected 
+			mime = detected
 		} else if len(content) > 0 {
 			detected := http.DetectContentType(content)
 			if detected != "application/octet-stream" {
@@ -390,7 +390,7 @@ func (b *ArchiveBundler) persistAssetFromURL(ctx context.Context, rawURL, assets
 			}
 		}
 	}
-	
+
 	return filepath.ToSlash(filepath.Join("assets", name)), mime, int64(len(content)), hash, model.ArchiveAssetDownloadStatusOK
 }
 
@@ -458,46 +458,46 @@ func buildRewriteAliases(pageBaseURL, sourceURL string) []string {
 // detectMimeFromExt returns a MIME type for the given file extension,
 // or "" if the type cannot be determined.
 func detectMimeFromExt(ext string) string {
-    // Tier 1: Hardcoded overrides for types that are commonly
-    // wrong or missing in OS MIME databases (e.g., Alpine containers)
-    switch strings.ToLower(ext) {
-    case ".css":
-        return "text/css"
-    case ".js", ".mjs":
-        return "application/javascript"
-    case ".json":
-        return "application/json"
-    case ".html", ".htm":
-        return "text/html"
-    case ".xml":
-        return "application/xml"
-    case ".svg":
-        return "image/svg+xml"
-    case ".woff":
-        return "font/woff"
-    case ".woff2":
-        return "font/woff2"
-    case ".ttf":
-        return "font/ttf"
-    case ".otf":
-        return "font/otf"
-    case ".wasm":
-        return "application/wasm"
-    }
+	// Tier 1: Hardcoded overrides for types that are commonly
+	// wrong or missing in OS MIME databases (e.g., Alpine containers)
+	switch strings.ToLower(ext) {
+	case ".css":
+		return "text/css"
+	case ".js", ".mjs":
+		return "application/javascript"
+	case ".json":
+		return "application/json"
+	case ".html", ".htm":
+		return "text/html"
+	case ".xml":
+		return "application/xml"
+	case ".svg":
+		return "image/svg+xml"
+	case ".woff":
+		return "font/woff"
+	case ".woff2":
+		return "font/woff2"
+	case ".ttf":
+		return "font/ttf"
+	case ".otf":
+		return "font/otf"
+	case ".wasm":
+		return "application/wasm"
+	}
 
-    // Tier 2: OS MIME database (covers .png, .jpg, .gif, .pdf,
-    // .mp4, .zip, and hundreds of others)
-    if detected := mime.TypeByExtension(strings.ToLower(ext)); detected != "" {
-        // Strip parameters: mime.TypeByExtension may return
-        // "text/xml; charset=utf-8"
-        if idx := strings.IndexByte(detected, ';'); idx != -1 {
-            detected = strings.TrimSpace(detected[:idx])
-        }
-        return detected
-    }
+	// Tier 2: OS MIME database (covers .png, .jpg, .gif, .pdf,
+	// .mp4, .zip, and hundreds of others)
+	if detected := mime.TypeByExtension(strings.ToLower(ext)); detected != "" {
+		// Strip parameters: mime.TypeByExtension may return
+		// "text/xml; charset=utf-8"
+		if idx := strings.IndexByte(detected, ';'); idx != -1 {
+			detected = strings.TrimSpace(detected[:idx])
+		}
+		return detected
+	}
 
-    // Unknown — let the caller decide what to do
-    return ""
+	// Unknown — let the caller decide what to do
+	return ""
 }
 
 func mimeToExt(mime string) string {

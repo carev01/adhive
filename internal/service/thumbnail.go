@@ -18,8 +18,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/disintegration/imaging"
 	"github.com/carev01/adhive/internal/model"
+	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
 )
 
@@ -406,7 +406,7 @@ func (s *ThumbnailService) downloadImage(imageURL string) ([]byte, error) {
 }
 
 // saveImage saves an image to disk
-func (s *ThumbnailService) saveImage(img image.Image, path, originalFormat string) error {
+func (s *ThumbnailService) saveImage(img image.Image, path, _ string) error {
 	// Try to save as WebP first
 	// Note: Standard library doesn't support WebP encoding, so we use PNG as fallback
 	// For true WebP support, we'd need bimg library with libvips
