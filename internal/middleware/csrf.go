@@ -45,11 +45,7 @@ func DefaultCSRFConfig() CSRFConfig {
 
 	// Check for explicit Secure mode setting
 	// Set CSRF_SECURE=false for development (HTTP), CSRF_SECURE=true for production (HTTPS)
-	secureMode := os.Getenv("CSRF_SECURE")
-	secure := false // Default to false for HTTP/localhost
-	if secureMode == "true" {
-		secure = true
-	}
+	secure := os.Getenv("CSRF_SECURE") == "true"
 
 	// SameSite: "Strict" blocks cross-origin, "Lax" allows some cross-origin
 	// For development with frontend on different port, use "Lax"
