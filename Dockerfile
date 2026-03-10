@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 1: Frontend build
 # =============================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -18,7 +18,7 @@ RUN npm run build
 # =============================================================================
 # Stage 2: Go build
 # =============================================================================
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make gcc musl-dev

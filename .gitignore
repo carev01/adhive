@@ -1,6 +1,6 @@
 # Binaries
 ad-catalog
-adhive
+/adhive
 *.exe
 *.exe~
 *.dll
