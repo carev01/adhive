@@ -8,11 +8,9 @@ run:
   
 # Linters section with enable/disable and settings
 linters:
-  # Only run linters that don't require type information from dependencies
   enable:
-    - gosimple
+    - staticcheck  # includes gosimple checks
     - ineffassign
-    - staticcheck
     - unused
     - misspell
     - unconvert
@@ -20,19 +18,19 @@ linters:
   disable:
     - errcheck
     
-  # Linter-specific settings (was linters-settings at root level)
+  # Linter-specific settings
   settings:
     misspell:
       locale: US
 
-  # Exclusion rules (was issues.exclude-rules)
+  # Exclusion rules
   exclusions:
     rules:
       - path: _test\.go
         linters:
           - unparam
 
-# Formatters section (new in v2)
+# Formatters section
 formatters:
   enable:
     - gofmt
