@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/carev01/adhive/internal/config"
 	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
-	"github.com/google/uuid"
-
-	"github.com/gin-gonic/gin"
 )
 
 // EntryHandler handles catalog entry HTTP requests

@@ -8,9 +8,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/service"
-	"github.com/google/uuid"
 )
 
 // ThumbnailConverter handles conversion of Shiori thumbnails to AdHive format

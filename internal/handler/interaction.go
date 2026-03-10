@@ -3,10 +3,11 @@ package handler
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+
 	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
-	"github.com/gin-gonic/gin"
 )
 
 // InteractionHandler handles interaction HTTP requests

@@ -11,6 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/gzip"
+	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+
 	"github.com/carev01/adhive/internal/config"
 	"github.com/carev01/adhive/internal/handler"
 	"github.com/carev01/adhive/internal/middleware"
@@ -19,10 +24,6 @@ import (
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/carev01/adhive/internal/service"
 	"github.com/carev01/adhive/internal/worker"
-	"github.com/gin-contrib/gzip"
-	"github.com/gin-gonic/gin"
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
 )
 
 // Version info - set via ldflags during build

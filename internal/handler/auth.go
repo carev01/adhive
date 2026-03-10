@@ -4,12 +4,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/carev01/adhive/internal/auth"
 	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // Request/Response DTOs

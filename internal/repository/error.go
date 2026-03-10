@@ -4,8 +4,9 @@ package repository
 import (
 	"errors"
 
-	apperrors "github.com/carev01/adhive/internal/errors"
 	"gorm.io/gorm"
+
+	apperrors "github.com/carev01/adhive/internal/errors"
 )
 
 // WrapDBError wraps a GORM error with an appropriate AppError.

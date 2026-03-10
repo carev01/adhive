@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/carev01/adhive/internal/config"
 	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/carev01/adhive/internal/repository"
-	"github.com/gin-gonic/gin"
 )
 
 // ArchiveOpsHandler exposes archive-centric observability and control endpoints.

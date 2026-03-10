@@ -17,8 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/carev01/adhive/internal/model"
 	"github.com/google/uuid"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // ArchiveBundler persists revision-oriented archive bundles and manifest metadata.

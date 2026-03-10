@@ -18,9 +18,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/carev01/adhive/internal/model"
 	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // ThumbnailService handles thumbnail extraction and storage

@@ -3,8 +3,9 @@ package repository
 import (
 	"time"
 
-	"github.com/carev01/adhive/internal/model"
 	"gorm.io/gorm"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // UserRepository handles user database operations

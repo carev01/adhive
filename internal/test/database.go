@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/carev01/adhive/internal/model"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // NewInMemoryDB creates an in-memory SQLite database for testing

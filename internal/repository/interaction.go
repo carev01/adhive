@@ -3,9 +3,10 @@ package repository
 import (
 	"context"
 
-	"github.com/carev01/adhive/internal/model"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // InteractionRepository handles interaction database operations

@@ -13,13 +13,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"github.com/carev01/adhive/internal/importer"
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	importtool "github.com/carev01/adhive/internal/shioriimport"
-	"github.com/glebarez/sqlite"
-	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // CLI flags
@@ -684,11 +685,7 @@ func parseBookmarks(values string) []ShioriBookmark {
 		}
 		// Remove surrounding parentheses if present
 		tuple = strings.Trim(tuple, "()")
-		bookmark, err := parseBookmarkTuple(tuple)
-		if err != nil {
-			logWarn("Failed to parse bookmark tuple: %v", err)
-			continue
-		}
+		bookmark := parseBookmarkTuple(tuple)
 		// Skip entries with empty URL
 		if bookmark.URL == "" {
 			continue
@@ -739,7 +736,7 @@ func parseBookmarkTuple(tuple string) ShioriBookmark {
 		}
 	}
 
-	return bm, nil
+	return bm
 }
 
 // parseTags parses tag INSERT VALUES

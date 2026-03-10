@@ -3,8 +3,9 @@ package handler
 import (
 	"net/http"
 
-	apperrors "github.com/carev01/adhive/internal/errors"
 	"github.com/gin-gonic/gin"
+
+	apperrors "github.com/carev01/adhive/internal/errors"
 )
 
 // ErrorResponse represents the standardized error response format.

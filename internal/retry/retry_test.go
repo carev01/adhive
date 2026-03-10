@@ -169,9 +169,9 @@ func TestDo_ContextCancellation(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("Expected context.Canceled error, got %v", err)
 	}
-	// Should stop retrying after context is cancelled
+	// Should stop retrying after context is canceled
 	if callCount > 3 {
-		t.Errorf("Call count = %d, should stop after context cancelled", callCount)
+		t.Errorf("Call count = %d, should stop after context canceled", callCount)
 	}
 }
 

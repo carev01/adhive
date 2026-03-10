@@ -10,11 +10,12 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
 	"github.com/carev01/adhive/internal/service"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // FileHandler handles file-related HTTP requests

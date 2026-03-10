@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/carev01/adhive/internal/model"
 	"github.com/carev01/adhive/internal/repository"
-	"github.com/gin-gonic/gin"
 )
 
 // ContextKey is the key for storing user in context

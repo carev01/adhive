@@ -1,8 +1,9 @@
 package repository
 
 import (
-	"github.com/carev01/adhive/internal/model"
 	"gorm.io/gorm"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // TagRepository handles tag database operations

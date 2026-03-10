@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/carev01/adhive/internal/model"
 	"gorm.io/gorm"
+
+	"github.com/carev01/adhive/internal/model"
 )
 
 // ArchiveRevisionRepository handles archive_revisions persistence.
