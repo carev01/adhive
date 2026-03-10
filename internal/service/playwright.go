@@ -289,9 +289,28 @@ func (s *PlaywrightService) IsAvailable() bool {
 		}
 	}
 	if browsersPath != "" {
-		chromiumPath := filepath.Join(browsersPath, "chromium")
-		if _, err := os.Stat(chromiumPath); err == nil {
-			return true
+		// Check for Playwright browsers directory
+		// Playwright v1.58+ installs to chromium-<version> format
+		entries, err := os.ReadDir(browsersPath)
+		if err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					// Look for chromium* directories or bundled Chromium binary
+					name := entry.Name()
+					if strings.HasPrefix(name, "chromium") {
+						// Check if the binary exists inside
+						binaryPath := filepath.Join(browsersPath, name, "chrome-linux64", "chrome")
+						if _, err := os.Stat(binaryPath); err == nil {
+							return true
+						}
+						// Also check chrome-linux variant (older versions)
+						binaryPath = filepath.Join(browsersPath, name, "chrome-linux", "chrome")
+						if _, err := os.Stat(binaryPath); err == nil {
+							return true
+						}
+					}
+				}
+			}
 		}
 	}
 
