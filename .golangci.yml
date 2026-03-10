@@ -1,3 +1,6 @@
+# This is the golangci-lint configuration for v9+
+version: 2
+
 # golangci-lint configuration for local development
 run:
   tests: false
