@@ -122,6 +122,9 @@ COPY --from=playwright-builder --chown=adhive:adhive /app/node_modules /app/node
 COPY --from=playwright-builder --chown=adhive:adhive /app/playwright-scraper.js /app/playwright-scraper.js
 COPY --from=playwright-builder --chown=adhive:adhive /app/package.json /app/package.json
 
+# Copy Playwright browser cache (critical for Chromium availability)
+COPY --from=playwright-builder --chown=adhive:adhive /root/.cache/ms-playwright /home/adhive/.cache/ms-playwright
+
 # Switch to non-root user
 USER adhive
 
@@ -131,6 +134,8 @@ ENV PORT=8080 \
     GO_ENV=production \
     LOG_LEVEL=info \
     HOME=/app \
+    # Playwright and Chromium configuration
+    PLAYWRIGHT_BROWSERS_PATH=/home/adhive/.cache/ms-playwright \
     # Chromium flags for containerized environment
     CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox"
 
