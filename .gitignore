@@ -15,6 +15,9 @@ build/
 # Data folder
 data/
 
+# Manifests folder
+manifests/
+
 # Go
 *.test
 *.out

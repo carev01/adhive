@@ -78,7 +78,7 @@ COPY --from=builder /app/import-shiori /app/import-shiori
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy frontend static files to /app/static
-COPY --from=frontend-builder --chown=adhive:adhive /app/frontend/.svelte-kit/output/client /app/static
+COPY --from=frontend-builder --chown=adhive:adhive /app/frontend/build /app/static
 
 # Switch to non-root user
 USER adhive

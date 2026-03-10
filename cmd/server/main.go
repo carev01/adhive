@@ -397,5 +397,38 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 		}
 	}
 
+	// Serve static frontend files
+	staticDir := os.Getenv("STATIC_DIR")
+	if staticDir == "" {
+		staticDir = "/app/static"
+	}
+
+	// Check if static directory exists
+	if _, err := os.Stat(staticDir); err == nil {
+		// Serve static files from /app/static
+		r.Static("/_app", staticDir+"/_app")
+
+		// SPA fallback - serve index.html for all non-API routes
+		r.NoRoute(func(c *gin.Context) {
+			// Don't intercept API routes
+			if strings.HasPrefix(c.Request.URL.Path, "/api/") ||
+				strings.HasPrefix(c.Request.URL.Path, "/health") ||
+				strings.HasPrefix(c.Request.URL.Path, "/version") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+				return
+			}
+
+			// Serve index.html for SPA routes
+			indexPath := filepath.Join(staticDir, "index.html")
+			if _, err := os.Stat(indexPath); err == nil {
+				c.File(indexPath)
+				return
+			}
+
+			// Fallback to 404 if no index.html
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		})
+	}
+
 	return r
 }

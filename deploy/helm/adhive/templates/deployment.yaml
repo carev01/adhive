@@ -29,40 +29,7 @@ spec:
       serviceAccountName: {{ include "adhive.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.pod.securityContext | nindent 8 }}
-      {{- if .Values.persistence.enabled }}
-      initContainers:
-      - name: init-permissions
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        command:
-          - /bin/sh
-          - -c
-          - |
-            mkdir -p {{ .Values.persistence.database.mountPath }} \
-                     {{ .Values.persistence.archives.mountPath }} \
-                     {{ .Values.persistence.thumbnails.mountPath }} \
-                     /app/logs
-            chown -R 1000:1000 {{ .Values.persistence.database.mountPath }} \
-                                 {{ .Values.persistence.archives.mountPath }} \
-                                 {{ .Values.persistence.thumbnails.mountPath }} \
-                                 /app/logs
-        volumeMounts:
-        {{- if .Values.persistence.database.enabled }}
-        - name: database
-          mountPath: {{ .Values.persistence.database.mountPath }}
-        {{- end }}
-        {{- if .Values.persistence.archives.enabled }}
-        - name: archives
-          mountPath: {{ .Values.persistence.archives.mountPath }}
-        {{- end }}
-        {{- if .Values.persistence.thumbnails.enabled }}
-        - name: thumbnails
-          mountPath: {{ .Values.persistence.thumbnails.mountPath }}
-        {{- end }}
-        securityContext:
-          runAsUser: 0
-          runAsGroup: 0
-      {{- end }}
+
       containers:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -167,6 +134,8 @@ spec:
           mountPath: /tmp
         - name: cache
           mountPath: /app/.cache
+        - name: logs
+          mountPath: /app/logs
       volumes:
       {{- if .Values.persistence.enabled }}
       {{- if .Values.persistence.database.enabled }}
@@ -193,6 +162,8 @@ spec:
       - name: tmp
         emptyDir: {}
       - name: cache
+        emptyDir: {}
+      - name: logs
         emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:

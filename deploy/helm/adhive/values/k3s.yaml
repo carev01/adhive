@@ -1,0 +1,110 @@
+# K3s values for AdHive - Internal home.lan deployment
+# Uses traefik ingress with wildcard certificate
+
+image:
+  repository: ghcr.io/carev01/adhive
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  hosts:
+    - host: adhive.home.lan
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - adhive.home.lan
+      secretName: wildcard-internal-tls
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+
+persistence:
+  enabled: true
+  storageClass: "longhorn-single-replica"
+  accessMode: ReadWriteOnce
+  database:
+    enabled: true
+    size: 1Gi
+    mountPath: /app/data
+  archives:
+    enabled: true
+    size: 10Gi
+    mountPath: /app/data/archives
+  thumbnails:
+    enabled: true
+    size: 5Gi
+    mountPath: /app/data/thumbnails
+
+# All env values MUST be quoted to avoid YAML type inference issues
+env:
+  SESSION_SECRET: ""
+  PORT: "8080"
+  GO_ENV: "production"
+  LOG_LEVEL: "info"
+  DATA_DIR: "/app/data"
+  HTTPS_ENABLED: "false"
+  CORS_ALLOWED_ORIGINS: ""
+  # High rate limits for internal use
+  RATE_LIMIT_GLOBAL: "10000"
+  RATE_LIMIT_AUTH: "100"
+  # CSRF disabled for internal use (behind reverse proxy)
+  CSRF_ENABLED: "false"
+  CSRF_SECURE: "false"
+  CSRF_SAME_SITE: "Lax"
+  USER_AGENT: ""
+  HUMAN_DOMAINS: ""
+  DEBUG: "false"
+
+secret:
+  enabled: true
+  data:
+    SESSION_SECRET: "ec66f95c8f5f714990212e92d7233b2793de9fc1cd79b9d03506b6857e60a106"
+
+pod:
+  annotations: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: "OnRootMismatch"
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+
+autoscaling:
+  enabled: false
+
+networkPolicy:
+  enabled: false
