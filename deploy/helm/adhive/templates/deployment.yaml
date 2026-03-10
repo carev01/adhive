@@ -91,6 +91,8 @@ spec:
           value: {{ .Values.env.CSRF_SAME_SITE | quote }}
         - name: DEBUG
           value: {{ .Values.env.DEBUG | quote }}
+        - name: HOME
+          value: "/app"
         {{- if .Values.env.USER_AGENT }}
         - name: USER_AGENT
           value: {{ .Values.env.USER_AGENT | quote }}
@@ -134,6 +136,8 @@ spec:
           mountPath: /tmp
         - name: cache
           mountPath: /app/.cache
+        - name: app-config
+          mountPath: /app/.config
         - name: logs
           mountPath: /app/logs
       volumes:
@@ -162,6 +166,8 @@ spec:
       - name: tmp
         emptyDir: {}
       - name: cache
+        emptyDir: {}
+      - name: app-config
         emptyDir: {}
       - name: logs
         emptyDir: {}

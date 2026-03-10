@@ -113,6 +113,12 @@ func (s *PlaywrightService) Scrape(ctx context.Context, url string, options map[
 		"headless": s.config.Headless,
 		"timeout":  s.config.Timeout.Milliseconds(),
 	}
+
+	// Pass Chromium executable path from environment if set
+	if execPath := os.Getenv("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"); execPath != "" {
+		config["executablePath"] = execPath
+	}
+
 	if s.config.UserAgent != "" {
 		config["userAgent"] = s.config.UserAgent
 	}
@@ -245,7 +251,7 @@ func (s *PlaywrightService) shouldUseManualMode(rawURL string) bool {
 	return false
 }
 
-// IsAvailable checks if Playwright is installed
+// IsAvailable checks if Playwright is installed and a Chromium binary exists
 func (s *PlaywrightService) IsAvailable() bool {
 	// Check if Node.js is available
 	if _, err := exec.LookPath("node"); err != nil {
@@ -257,7 +263,39 @@ func (s *PlaywrightService) IsAvailable() bool {
 		return false
 	}
 
-	return true
+	// Check for Chromium binary - either system or bundled
+	chromiumPaths := []string{
+		"/usr/bin/chromium-browser", // Alpine system Chromium
+		"/usr/bin/chromium",         // Alternative system Chromium
+	}
+
+	// Also check env var for custom path
+	if envPath := os.Getenv("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"); envPath != "" {
+		chromiumPaths = append([]string{envPath}, chromiumPaths...)
+	}
+
+	for _, path := range chromiumPaths {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+
+	// Fall back to checking bundled Playwright browsers
+	browsersPath := os.Getenv("PLAYWRIGHT_BROWSERS_PATH")
+	if browsersPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			browsersPath = filepath.Join(homeDir, ".cache", "ms-playwright")
+		}
+	}
+	if browsersPath != "" {
+		chromiumPath := filepath.Join(browsersPath, "chromium")
+		if _, err := os.Stat(chromiumPath); err == nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 // InstallBrowsers installs Playwright browsers

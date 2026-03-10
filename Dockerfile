@@ -55,20 +55,67 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o import-shiori ./cmd/import-shiori
 
 # =============================================================================
-# Stage 3: Final runtime image
+# Stage 3: Playwright browser installation
 # =============================================================================
-FROM alpine:3.19
+FROM node:24-alpine AS playwright-builder
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata dumb-init
+WORKDIR /app
+
+# Copy package files for Playwright
+COPY package.json package-lock.json* ./
+COPY playwright-scraper.js ./
+
+# Install Node.js dependencies (Playwright + adblocker + autoconsent)
+RUN npm ci --omit=dev
+
+# Install Playwright browsers (Chromium only) - Alpine's system chromium
+# We'll use Alpine's chromium package in the runtime image instead
+RUN npx playwright install chromium
+
+# =============================================================================
+# Stage 4: Final runtime image
+# =============================================================================
+FROM node:24-alpine
+
+# Install runtime dependencies for Chromium
+# Alpine's chromium package pulls in most dependencies automatically
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    dumb-init \
+    # Chromium and its dependencies
+    chromium \
+    # Additional fonts
+    font-noto-cjk \
+    font-noto-emoji \
+    # Required for Playwright's bundled Chromium (glibc compatibility)
+    libstdc++ \
+    libgcc \
+    # X11 libs that may not be pulled in automatically
+    libx11 \
+    libxcb \
+    libxcomposite \
+    libxdamage \
+    libxrandr \
+    libxfixes \
+    libxkbcommon \
+    mesa-gl \
+    # Audio support
+    alsa-lib \
+    # DBus for browser communication
+    dbus-libs
 
 # Create non-root user and group
-RUN addgroup -g 1000 -S adhive && \
-    adduser -u 1000 -S -G adhive -s /bin/sh adhive
+# Use UID 1001 to avoid conflict with base image's user
+RUN addgroup -g 1001 -S adhive && \
+    adduser -u 1001 -S -G adhive -s /bin/sh adhive
 
 # Create required directories with proper ownership
-RUN mkdir -p /app/static /app/data /app/logs /app/backups && \
-    chown -R adhive:adhive /app
+# Playwright needs a cache directory and tmp for profile data
+RUN mkdir -p /app/static /app/data /app/logs /app/backups \
+    /home/adhive/.cache \
+    /tmp/playwright \
+    && chown -R adhive:adhive /app /home/adhive /tmp/playwright
 
 WORKDIR /app
 
@@ -80,6 +127,14 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # Copy frontend static files to /app/static
 COPY --from=frontend-builder --chown=adhive:adhive /app/frontend/build /app/static
 
+# Copy Playwright scraper and node_modules
+COPY --from=playwright-builder --chown=adhive:adhive /app/node_modules /app/node_modules
+COPY --from=playwright-builder --chown=adhive:adhive /app/playwright-scraper.js /app/playwright-scraper.js
+COPY --from=playwright-builder --chown=adhive:adhive /app/package.json /app/package.json
+
+# Playwright is installed but we'll use Alpine's system Chromium
+# The system chromium is installed by the apk package in the runtime stage
+
 # Switch to non-root user
 USER adhive
 
@@ -87,7 +142,12 @@ USER adhive
 ENV PORT=8080 \
     DATA_DIR=/app/data \
     GO_ENV=production \
-    LOG_LEVEL=info
+    LOG_LEVEL=info \
+    # Playwright configuration - use Alpine's system Chromium
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    HOME=/app \
+    # Chromium flags for containerized environment
+    CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox"
 
 # Expose port
 EXPOSE 8080

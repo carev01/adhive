@@ -30,11 +30,11 @@ ingress:
 
 resources:
   limits:
-    cpu: 1000m
-    memory: 512Mi
+    cpu: 2000m
+    memory: 2Gi
   requests:
     cpu: 100m
-    memory: 128Mi
+    memory: 512Mi
 
 livenessProbe:
   enabled: true
@@ -89,9 +89,9 @@ pod:
   annotations: {}
   securityContext:
     runAsNonRoot: true
-    runAsUser: 1000
-    runAsGroup: 1000
-    fsGroup: 1000
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
     fsGroupChangePolicy: "OnRootMismatch"
 
 containerSecurityContext:

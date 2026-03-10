@@ -947,7 +947,10 @@ async function scrape(config) {
 }
 
 async function _scrapeAttempt(config, attemptNumber) {
-  const browser = await chromium.launch({
+  // Use system Chromium on Alpine (from PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH env or config)
+  const executablePath = config.executablePath || process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || null;
+  
+  const launchOptions = {
     headless: config.headless !== false,
     args: [
       '--disable-blink-features=AutomationControlled',
@@ -960,7 +963,14 @@ async function _scrapeAttempt(config, attemptNumber) {
       '--no-zygote',
       '--disable-gpu',
     ],
-  });
+  };
+  
+  // If using system Chromium, specify the executable path
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
+  
+  const browser = await chromium.launch(launchOptions);
 
   // All fingerprint signals derived from one source of truth: CHROME_MAJOR.
   const effectiveUA = config.userAgent || buildUserAgent(CHROME_MAJOR);
