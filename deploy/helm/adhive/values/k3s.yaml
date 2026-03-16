@@ -19,14 +19,13 @@ ingress:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
   hosts:
-    - host: adhive.home.lan
+    - host: adhive.vps.home.lan
       paths:
         - path: /
           pathType: Prefix
   tls:
     - hosts:
-        - adhive.home.lan
-      secretName: wildcard-internal-tls
+        - adhive.vps.home.lan
 
 resources:
   limits:
