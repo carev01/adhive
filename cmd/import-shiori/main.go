@@ -420,7 +420,7 @@ func importSQLData() error {
 			valuesBuffer.Reset()
 
 			// Extract table name
-			re := regexp.MustCompile("INSERT\\s+INTO\\s+[`]?([^`\\s]+)[`]?")
+			re := regexp.MustCompile("INSERT\\s+INTO\\s+[`]*(\\w+)[`]*")
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				currentTable = matches[1]
@@ -447,7 +447,7 @@ func importSQLData() error {
 			valuesBuffer.WriteString(" " + line)
 
 			// Check if we've reached end of statement (ends with semicolon)
-			if strings.HasSuffix(strings.TrimSpace(line), ";") || strings.Contains(line, ";") {
+			if strings.HasSuffix(line, ";") {
 				valuesStr := valuesBuffer.String()
 				valuesBuffer.Reset()
 
@@ -657,12 +657,12 @@ func parseBookmarks(values string) []ShioriBookmark {
 			continue
 		}
 		if inQuote && ch == quoteChar {
-			// Check for escaped quote (doubled quote like '' or "")
-			if i+1 < len(values) && values[i+1] == quoteChar {
-				// Skip both quotes - increment i by changing loop logic below instead
-			} else {
-				inQuote = false
+		// Check for escaped quote (doubled quote like '' or "")
+		if i+1 < len(values) && values[i+1] == quoteChar {
+				i++ // Skip the second quote, stay in quote mode
+				continue
 			}
+			inQuote = false
 			continue
 		}
 
@@ -686,7 +686,9 @@ func parseBookmarks(values string) []ShioriBookmark {
 			continue
 		}
 		// Remove surrounding parentheses if present
-		tuple = strings.Trim(tuple, "()")
+		if strings.HasPrefix(tuple, "(") && strings.HasSuffix(tuple, ")") {
+			tuple = tuple[1 : len(tuple)-1]
+		}
 		bookmark := parseBookmarkTuple(tuple)
 		// Skip entries with empty URL
 		if bookmark.URL == "" {
