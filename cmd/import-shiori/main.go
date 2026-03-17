@@ -420,7 +420,7 @@ func importSQLData() error {
 			valuesBuffer.Reset()
 
 			// Extract table name
-			re := regexp.MustCompile("INSERT\\s+INTO\\s+[`]*(\\w+)[`]*")
+			re := regexp.MustCompile("INSERT\\s+INTO\\s+[`]?([^`\\s]+)[`]?")
 			matches := re.FindStringSubmatch(line)
 			if len(matches) > 1 {
 				currentTable = matches[1]
@@ -447,7 +447,8 @@ func importSQLData() error {
 			valuesBuffer.WriteString(" " + line)
 
 			// Check if we've reached end of statement (ends with semicolon)
-			if strings.HasSuffix(line, ";") {
+			trimmed := strings.TrimRight(line, " \t;")
+			if strings.HasSuffix(strings.TrimSpace(line), ";") || strings.Contains(line, ";") {
 				valuesStr := valuesBuffer.String()
 				valuesBuffer.Reset()
 
@@ -460,10 +461,12 @@ func importSQLData() error {
 				case "bookmark", "bookmarks":
 					parsed := parseBookmarks(valuesStr)
 					stats.BookmarksFound += len(parsed)
+					bookmarks = append(bookmarks, parsed...)
 
 				case "tag", "tags":
 					parsed := parseTags(valuesStr)
 					stats.TagsFound += len(parsed)
+					tags = append(tags, parsed...)
 				}
 
 				inValues = false
