@@ -447,7 +447,6 @@ func importSQLData() error {
 			valuesBuffer.WriteString(" " + line)
 
 			// Check if we've reached end of statement (ends with semicolon)
-			trimmed := strings.TrimRight(line, " \t;")
 			if strings.HasSuffix(strings.TrimSpace(line), ";") || strings.Contains(line, ";") {
 				valuesStr := valuesBuffer.String()
 				valuesBuffer.Reset()
