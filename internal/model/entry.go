@@ -67,7 +67,10 @@ type EntryUpdateInput struct {
 type EntryFilter struct {
 	Page           int
 	Limit          int
-	TagID          string
+	TagID          string            // Legacy single-tag filter (backward compat)
+	Tags           []string          // Multi-tag filter IDs
+	TagsLogic      string            // "and" or "or" (default "and")
+	CustomFields   map[string]string // custom_field[name]=value filters
 	Search         string
 	Status         ArchiveStatus
 	ExcludeTried   bool

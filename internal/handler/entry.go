@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -72,22 +73,23 @@ type UpdateEntryRequest struct {
 }
 
 type EntryResponse struct {
-	ID                       string    `json:"id"`
-	UserID                   string    `json:"user_id"`
-	URL                      string    `json:"url"`
-	Title                    string    `json:"title,omitempty"`
-	Description              string    `json:"description,omitempty"`
-	PhoneNumber              string    `json:"phone_number,omitempty"`
-	Location                 string    `json:"location,omitempty"`
-	ThumbnailPath            string    `json:"thumbnail_path,omitempty"`
-	ArchivePath              string    `json:"archive_path,omitempty"`
-	ArchiveStatus            string    `json:"archive_status"`
-	ArchiveFidelity          string    `json:"archive_fidelity,omitempty"`
-	ArchiveCurrentRevisionID string    `json:"archive_current_revision_id,omitempty"`
-	ThumbnailSource          string    `json:"thumbnail_source,omitempty"`
-	Tags                     []TagInfo `json:"tags,omitempty"`
-	CreatedAt                string    `json:"created_at"`
-	UpdatedAt                string    `json:"updated_at"`
+	ID                       string                   `json:"id"`
+	UserID                   string                   `json:"user_id"`
+	URL                      string                   `json:"url"`
+	Title                    string                   `json:"title,omitempty"`
+	Description              string                   `json:"description,omitempty"`
+	PhoneNumber              string                   `json:"phone_number,omitempty"`
+	Location                 string                   `json:"location,omitempty"`
+	ThumbnailPath            string                   `json:"thumbnail_path,omitempty"`
+	ArchivePath              string                   `json:"archive_path,omitempty"`
+	ArchiveStatus            string                   `json:"archive_status"`
+	ArchiveFidelity          string                   `json:"archive_fidelity,omitempty"`
+	ArchiveCurrentRevisionID string                   `json:"archive_current_revision_id,omitempty"`
+	ThumbnailSource          string                   `json:"thumbnail_source,omitempty"`
+	Tags                     []TagInfo                `json:"tags,omitempty"`
+	CustomFields             []model.CustomFieldResponse `json:"custom_fields,omitempty"`
+	CreatedAt                string                   `json:"created_at"`
+	UpdatedAt                string                   `json:"updated_at"`
 }
 
 type TagInfo struct {
@@ -155,6 +157,27 @@ func (h *EntryHandler) List(c *gin.Context) {
 	hasInteraction := c.Query("has_interaction") == "true"
 	minScore, _ := strconv.Atoi(c.Query("min_score"))
 
+	// New faceted filter params
+	tagsRaw := c.Query("tags") // comma-separated tag IDs
+	tagsLogic := c.DefaultQuery("tags_logic", "and") // "and" or "or"
+	customFields := c.QueryMap("custom_field") // custom_field[key]=value
+
+	// Parse tags
+	var tags []string
+	if tagsRaw != "" {
+		for _, t := range strings.Split(tagsRaw, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				tags = append(tags, t)
+			}
+		}
+	}
+
+	// Validate tags_logic
+	if tagsLogic != "and" && tagsLogic != "or" {
+		tagsLogic = "and"
+	}
+
 	if page < 1 {
 		page = 1
 	}
@@ -166,6 +189,9 @@ func (h *EntryHandler) List(c *gin.Context) {
 		Page:           page,
 		Limit:          limit,
 		TagID:          tagID,
+		Tags:           tags,
+		TagsLogic:      tagsLogic,
+		CustomFields:   customFields,
 		ExcludeTried:   excludeTried,
 		Search:         search,
 		DateFrom:       dateFrom,
@@ -198,12 +224,18 @@ func (h *EntryHandler) List(c *gin.Context) {
 		return
 	}
 
+	// Batch fetch tags for all entries (fixes N+1)
+	entryIDs := make([]string, len(result.Entries))
+	for i, e := range result.Entries {
+		entryIDs[i] = e.ID
+	}
+	tagsMap, _ := h.entryRepo.GetEntriesTags(ctx, entryIDs)
+
 	entries := make([]*EntryResponse, len(result.Entries))
 	for i, e := range result.Entries {
-		// Fetch tags for each entry (could be optimized with a single query)
-		tags, _ := h.tagRepo.GetEntryTags(e.ID)
-		tagInfos := make([]TagInfo, len(tags))
-		for j, t := range tags {
+		entryTags := tagsMap[e.ID]
+		tagInfos := make([]TagInfo, len(entryTags))
+		for j, t := range entryTags {
 			tagInfos[j] = TagInfo{ID: t.ID, Name: t.Name, Color: t.Color}
 		}
 		entries[i] = entryToResponse(e, tagInfos)

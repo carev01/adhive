@@ -42,12 +42,24 @@ func (r *EntryRepository) GetByID(ctx context.Context, id string) (*model.Catalo
 	return &entry, nil
 }
 
-// GetByUserID finds all entries for a user with pagination
-func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter *model.EntryFilter) (*model.EntryListResult, error) {
-	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+// applyCommonFilters applies all non-search filters to a query.
+// This is shared between GetByUserID and Search methods.
+func applyCommonFilters(query *gorm.DB, userID string, filter *model.EntryFilter) *gorm.DB {
+	// Multi-tag AND filtering: entry must have ALL specified tags
+	if len(filter.Tags) > 0 {
+		if filter.TagsLogic == "or" {
+			// OR: entry has ANY of the specified tags
+			query = query.Where("catalog_entries.id IN (SELECT et.entry_id FROM entry_tags et WHERE et.tag_id IN ?)", filter.Tags)
+		} else {
+			// AND (default): entry has ALL specified tags
+			for _, tagID := range filter.Tags {
+				query = query.Where("catalog_entries.id IN (SELECT et.entry_id FROM entry_tags et WHERE et.tag_id = ?)", tagID)
+			}
+		}
+	}
 
-	// Apply filters
-	if filter.TagID != "" {
+	// Legacy single-tag filter (backward compat)
+	if filter.TagID != "" && len(filter.Tags) == 0 {
 		query = query.Joins("JOIN entry_tags ON catalog_entries.id = entry_tags.entry_id").
 			Where("entry_tags.tag_id = ?", filter.TagID)
 	}
@@ -60,17 +72,14 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 		query = query.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
 	}
 
-	// HasInteraction filter - only entries with interactions
 	if filter.HasInteraction {
 		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
 	}
 
-	// MinScore filter - entries where user's score >= minScore (implies HasInteraction)
 	if filter.MinScore > 0 {
 		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
 	}
 
-	// Date range filter
 	if filter.DateFrom != "" {
 		query = query.Where("created_at >= ?", filter.DateFrom)
 	}
@@ -78,28 +87,55 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 		query = query.Where("created_at <= ?", filter.DateTo+" 23:59:59")
 	}
 
-	// Source/domain filter
 	if filter.Source != "" {
 		query = query.Where("url LIKE ?", "%"+filter.Source+"%")
 	}
 
-	// Location filter
 	if filter.Location != "" {
 		query = query.Where("location LIKE ?", "%"+filter.Location+"%")
 	}
 
-	// Determine sort order
+	// Custom field EAV filtering
+	for fieldName, fieldValue := range filter.CustomFields {
+		query = query.Where("catalog_entries.id IN (SELECT cf.entry_id FROM custom_fields cf WHERE cf.field_name = ? AND cf.field_value = ?)", fieldName, fieldValue)
+	}
+
+	return query
+}
+
+// applySortOrder determines sort field and direction from filter
+func applySortOrder(filter *model.EntryFilter, tablePrefix string) string {
 	sortField := "created_at"
 	sortDir := "DESC"
+	if tablePrefix != "" {
+		sortField = tablePrefix + "." + sortField
+	}
 	switch filter.SortBy {
 	case "title":
-		sortField = "title"
+		if tablePrefix != "" {
+			sortField = tablePrefix + ".title"
+		} else {
+			sortField = "title"
+		}
 	case "updated_at":
-		sortField = "updated_at"
+		if tablePrefix != "" {
+			sortField = tablePrefix + ".updated_at"
+		} else {
+			sortField = "updated_at"
+		}
 	}
 	if filter.SortOrder == "asc" {
 		sortDir = "ASC"
 	}
+	return sortField + " " + sortDir
+}
+
+// GetByUserID finds all entries for a user with pagination and filtering
+func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter *model.EntryFilter) (*model.EntryListResult, error) {
+	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+
+	// Apply all common filters
+	query = applyCommonFilters(query, userID, filter)
 
 	// Count total
 	var total int64
@@ -108,7 +144,7 @@ func (r *EntryRepository) GetByUserID(ctx context.Context, userID string, filter
 	// Apply pagination
 	offset := (filter.Page - 1) * filter.Limit
 	var entries []*model.CatalogEntry
-	err := query.Order(sortField + " " + sortDir).
+	err := query.Order(applySortOrder(filter, "")).
 		Offset(offset).
 		Limit(filter.Limit).
 		Find(&entries).Error
@@ -149,51 +185,11 @@ func (r *EntryRepository) searchWithFTS5(ctx context.Context, userID, query stri
 		Where("catalog_entries.user_id = ?", userID).
 		Where("entries_fts MATCH ?", query+"*")
 
-	// Apply additional filters
-	if filter.ExcludeTried {
-		ftsQuery = ftsQuery.Where("catalog_entries.id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
-	}
-
-	// Date range filter
-	if filter.DateFrom != "" {
-		ftsQuery = ftsQuery.Where("catalog_entries.created_at >= ?", filter.DateFrom)
-	}
-	if filter.DateTo != "" {
-		ftsQuery = ftsQuery.Where("catalog_entries.created_at <= ?", filter.DateTo+" 23:59:59")
-	}
-
-	// Source/domain filter
-	if filter.Source != "" {
-		ftsQuery = ftsQuery.Where("catalog_entries.url LIKE ?", "%"+filter.Source+"%")
-	}
-
-	// Location filter
-	if filter.Location != "" {
-		ftsQuery = ftsQuery.Where("catalog_entries.location LIKE ?", "%"+filter.Location+"%")
-	}
-
-	// HasInteraction filter
-	if filter.HasInteraction {
-		ftsQuery = ftsQuery.Where("catalog_entries.id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
-	}
-
-	// MinScore filter
-	if filter.MinScore > 0 {
-		ftsQuery = ftsQuery.Where("catalog_entries.id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
-	}
+	// Apply all common filters using the same function
+	ftsQuery = applyCommonFilters(ftsQuery, userID, filter)
 
 	// Determine sort order
-	sortField := "catalog_entries.created_at"
-	sortDir := "DESC"
-	switch filter.SortBy {
-	case "title":
-		sortField = "catalog_entries.title"
-	case "updated_at":
-		sortField = "catalog_entries.updated_at"
-	}
-	if filter.SortOrder == "asc" {
-		sortDir = "ASC"
-	}
+	orderClause := applySortOrder(filter, "catalog_entries")
 
 	// Count total matching entries
 	var total int64
@@ -208,7 +204,7 @@ func (r *EntryRepository) searchWithFTS5(ctx context.Context, userID, query stri
 		Joins("JOIN catalog_entries ON catalog_entries.rowid = fts.rowid").
 		Where("catalog_entries.user_id = ?", userID).
 		Where("entries_fts MATCH ?", query+"*").
-		Order(sortField+" "+sortDir).
+		Order(orderClause).
 		Offset(offset).
 		Limit(filter.Limit).
 		Pluck("id", &entryIDs).Error
@@ -222,7 +218,7 @@ func (r *EntryRepository) searchWithFTS5(ctx context.Context, userID, query stri
 	if len(entryIDs) > 0 {
 		err = r.db.WithContext(ctx).
 			Where("id IN ?", entryIDs).
-			Order(sortField + " " + sortDir).
+			Order(orderClause).
 			Find(&entries).Error
 		if err != nil {
 			return nil, err
@@ -246,51 +242,11 @@ func (r *EntryRepository) searchWithLike(ctx context.Context, userID, query stri
 		Where("LOWER(title) LIKE ? OR LOWER(description) LIKE ? OR LOWER(phone_number) LIKE ? OR LOWER(location) LIKE ? OR LOWER(url) LIKE ?",
 			searchPattern, searchPattern, searchPattern, searchPattern, searchPattern)
 
-	// Apply ExcludeTried filter
-	if filter.ExcludeTried {
-		baseQuery = baseQuery.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
-	}
-
-	// Date range filter
-	if filter.DateFrom != "" {
-		baseQuery = baseQuery.Where("created_at >= ?", filter.DateFrom)
-	}
-	if filter.DateTo != "" {
-		baseQuery = baseQuery.Where("created_at <= ?", filter.DateTo+" 23:59:59")
-	}
-
-	// Source/domain filter
-	if filter.Source != "" {
-		baseQuery = baseQuery.Where("url LIKE ?", "%"+filter.Source+"%")
-	}
-
-	// Location filter
-	if filter.Location != "" {
-		baseQuery = baseQuery.Where("location LIKE ?", "%"+filter.Location+"%")
-	}
-
-	// HasInteraction filter
-	if filter.HasInteraction {
-		baseQuery = baseQuery.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
-	}
-
-	// MinScore filter
-	if filter.MinScore > 0 {
-		baseQuery = baseQuery.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
-	}
+	// Apply all common filters
+	baseQuery = applyCommonFilters(baseQuery, userID, filter)
 
 	// Sort
-	sortField := "created_at"
-	sortDir := "DESC"
-	switch filter.SortBy {
-	case "title":
-		sortField = "title"
-	case "updated_at":
-		sortField = "updated_at"
-	}
-	if filter.SortOrder == "asc" {
-		sortDir = "ASC"
-	}
+	orderClause := applySortOrder(filter, "")
 
 	// Count total
 	var total int64
@@ -300,7 +256,7 @@ func (r *EntryRepository) searchWithLike(ctx context.Context, userID, query stri
 	offset := (filter.Page - 1) * filter.Limit
 	var entries []*model.CatalogEntry
 	err := baseQuery.
-		Order(sortField + " " + sortDir).
+		Order(orderClause).
 		Offset(offset).
 		Limit(filter.Limit).
 		Find(&entries).Error
@@ -355,6 +311,10 @@ func (r *EntryRepository) Delete(ctx context.Context, id, userID string) error {
 		if err := tx.Where("entry_id = ?", id).Delete(&model.EntryTag{}).Error; err != nil {
 			return WrapDBError(err, "Entry", id)
 		}
+		// Delete custom fields
+		if err := tx.Where("entry_id = ?", id).Delete(&model.CustomField{}).Error; err != nil {
+			return WrapDBError(err, "Entry", id)
+		}
 		// Delete interactions
 		if err := tx.Where("entry_id = ?", id).Delete(&model.Interaction{}).Error; err != nil {
 			return WrapDBError(err, "Entry", id)
@@ -370,65 +330,15 @@ func (r *EntryRepository) GetByUserIDWithTags(ctx context.Context, userID string
 	// Build query with preloaded tags
 	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
 
-	// Apply filters
-	if filter.TagID != "" {
-		query = query.Joins("JOIN entry_tags ON catalog_entries.id = entry_tags.entry_id").
-			Where("entry_tags.tag_id = ?", filter.TagID)
-	}
-
-	if filter.Status != "" {
-		query = query.Where("archive_status = ?", filter.Status)
-	}
-
-	if filter.ExcludeTried {
-		query = query.Where("id NOT IN (SELECT entry_id FROM interactions WHERE user_id = ? AND tried = ?)", userID, true)
-	}
-
-	// HasInteraction filter
-	if filter.HasInteraction {
-		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ?)", userID)
-	}
-
-	// MinScore filter
-	if filter.MinScore > 0 {
-		query = query.Where("id IN (SELECT entry_id FROM interactions WHERE user_id = ? AND score >= ?)", userID, filter.MinScore)
-	}
-
-	// Date range filtering
-	if filter.DateFrom != "" {
-		query = query.Where("created_at >= ?", filter.DateFrom)
-	}
-	if filter.DateTo != "" {
-		query = query.Where("created_at <= ?", filter.DateTo)
-	}
-
-	// Source/domain filtering
-	if filter.Source != "" {
-		query = query.Where("url LIKE ?", "%"+filter.Source+"%")
-	}
-
-	// Location filter
-	if filter.Location != "" {
-		query = query.Where("location LIKE ?", "%"+filter.Location+"%")
-	}
+	// Apply all common filters
+	query = applyCommonFilters(query, userID, filter)
 
 	// Count total
 	var total int64
 	query.Model(&model.CatalogEntry{}).Count(&total)
 
 	// Build dynamic ORDER BY clause
-	sortField := "created_at"
-	sortDir := "DESC"
-	if filter.SortBy != "" {
-		switch filter.SortBy {
-		case "title", "updated_at":
-			sortField = filter.SortBy
-		}
-	}
-	if filter.SortOrder != "" && (filter.SortOrder == "asc" || filter.SortOrder == "ASC") {
-		sortDir = "ASC"
-	}
-	orderClause := sortField + " " + sortDir
+	orderClause := applySortOrder(filter, "")
 
 	// Apply pagination (tags fetched separately by handler)
 	offset := (filter.Page - 1) * filter.Limit
@@ -448,6 +358,86 @@ func (r *EntryRepository) GetByUserIDWithTags(ctx context.Context, userID string
 		Page:    filter.Page,
 		Limit:   filter.Limit,
 	}, nil
+}
+
+// GetEntriesTags fetches tags for multiple entries in a single query (batch fetch to fix N+1)
+func (r *EntryRepository) GetEntriesTags(ctx context.Context, entryIDs []string) (map[string][]model.Tag, error) {
+	if len(entryIDs) == 0 {
+		return map[string][]model.Tag{}, nil
+	}
+
+	type entryTagRow struct {
+		EntryID string `gorm:"column:entry_id"`
+		model.Tag
+	}
+
+	var rows []entryTagRow
+	err := r.db.WithContext(ctx).
+		Table("entry_tags").
+		Select("entry_tags.entry_id, tags.id, tags.user_id, tags.name, tags.color, tags.created_at").
+		Joins("JOIN tags ON tags.id = entry_tags.tag_id").
+		Where("entry_tags.entry_id IN ?", entryIDs).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]model.Tag, len(entryIDs))
+	for _, row := range rows {
+		result[row.EntryID] = append(result[row.EntryID], row.Tag)
+	}
+	return result, nil
+}
+
+// Facets returns aggregated filter options for the facets endpoint
+func (r *EntryRepository) Facets(ctx context.Context, userID string) (*model.FacetResult, error) {
+	result := &model.FacetResult{}
+
+	// Tag counts
+	var tagFacets []model.TagFacet
+	err := r.db.WithContext(ctx).
+		Table("tags").
+		Select("tags.id, tags.name, tags.color, COUNT(entry_tags.entry_id) as count").
+		Joins("LEFT JOIN entry_tags ON tags.id = entry_tags.tag_id").
+		Joins("LEFT JOIN catalog_entries ON entry_tags.entry_id = catalog_entries.id AND catalog_entries.user_id = ?", userID).
+		Where("tags.user_id = ?", userID).
+		Group("tags.id, tags.name, tags.color").
+		Order("tags.name ASC").
+		Find(&tagFacets).Error
+	if err != nil {
+		return nil, WrapDBError(err, "Facet", "")
+	}
+	result.Tags = tagFacets
+
+	// Status counts
+	var statusFacets []model.StatusFacet
+	err = r.db.WithContext(ctx).
+		Table("catalog_entries").
+		Select("archive_status as status, COUNT(*) as count").
+		Where("user_id = ?", userID).
+		Group("archive_status").
+		Order("count DESC").
+		Find(&statusFacets).Error
+	if err != nil {
+		return nil, WrapDBError(err, "Facet", "")
+	}
+	result.Statuses = statusFacets
+
+	// Date range
+	var dateRange model.DateRangeFacet
+	err = r.db.WithContext(ctx).
+		Table("catalog_entries").
+		Select("MIN(created_at) as min, MAX(created_at) as max").
+		Where("user_id = ?", userID).
+		Find(&dateRange).Error
+	if err != nil {
+		return nil, WrapDBError(err, "Facet", "")
+	}
+	if dateRange.Min != "" || dateRange.Max != "" {
+		result.DateRange = &dateRange
+	}
+
+	return result, nil
 }
 
 // AddTag adds a tag to an entry
@@ -517,6 +507,11 @@ func (r *EntryRepository) BulkDelete(ctx context.Context, userID string, entryID
 
 		// Delete entry_tag associations
 		if err := tx.Where("entry_id IN ?", entryIDs).Delete(&model.EntryTag{}).Error; err != nil {
+			return err
+		}
+
+		// Delete custom fields
+		if err := tx.Where("entry_id IN ?", entryIDs).Delete(&model.CustomField{}).Error; err != nil {
 			return err
 		}
 

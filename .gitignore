@@ -69,3 +69,6 @@ temp/
 # Test artifacts
 test-results/
 playwright-report/
+
+# Test database files
+internal/integration/adhive-*

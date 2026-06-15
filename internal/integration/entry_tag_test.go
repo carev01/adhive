@@ -38,7 +38,7 @@ func setupTestDB(t *testing.T) *TestDatabaseWithEntries {
 		&model.User{}, &model.Session{}, &model.CatalogEntry{},
 		&model.Tag{}, &model.EntryTag{},
 		&model.ArchiveRevision{}, &model.ArchiveAsset{},
-		&model.Interaction{},
+		&model.Interaction{}, &model.CustomField{},
 	)
 
 	return &TestDatabaseWithEntries{
