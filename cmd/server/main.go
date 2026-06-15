@@ -188,6 +188,7 @@ func main() {
 	tagHandler := handler.NewTagHandler(tagRepo)
 	interactionHandler := handler.NewInteractionHandler(interactionRepo, entryRepo)
 	archiveOpsHandler := handler.NewArchiveOpsHandler(archiveRevisionRepo, archiveAssetRepo, entryRepo, archiveWorker, storageConfig)
+	importExportHandler := handler.NewImportExportHandler(entryRepo, tagRepo)
 
 	// Initialize storage directories
 	if err := fileHandler.InitStorage(); err != nil {
@@ -198,7 +199,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(sessionRepo)
 
 	// Router setup
-	r := setupRouter(authHandler, entryHandler, tagHandler, interactionHandler, archiveOpsHandler, authMiddleware, fileHandler, thumbnailHandler)
+	r := setupRouter(authHandler, entryHandler, tagHandler, interactionHandler, archiveOpsHandler, authMiddleware, fileHandler, thumbnailHandler, importExportHandler)
 
 	// Create context with cancellation for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -264,7 +265,7 @@ func configureSQLite(db *gorm.DB) error {
 }
 
 // setupRouter configures all routes
-func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHandler, tagHandler *handler.TagHandler, interactionHandler *handler.InteractionHandler, archiveOpsHandler *handler.ArchiveOpsHandler, authMiddleware *middleware.AuthMiddleware, fileHandler *handler.FileHandler, thumbnailHandler *handler.ThumbnailHandler) *gin.Engine {
+func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHandler, tagHandler *handler.TagHandler, interactionHandler *handler.InteractionHandler, archiveOpsHandler *handler.ArchiveOpsHandler, authMiddleware *middleware.AuthMiddleware, fileHandler *handler.FileHandler, thumbnailHandler *handler.ThumbnailHandler, importExportHandler *handler.ImportExportHandler) *gin.Engine {
 	r := gin.Default()
 
 	// Enable gzip compression for responses > 1KB
@@ -338,6 +339,12 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 			entries.POST("/bulk/tag", entryHandler.BulkTag)
 			entries.POST("/bulk/delete", entryHandler.BulkDelete)
 			entries.POST("/bulk/archive", entryHandler.BulkArchive)
+
+			// Import/Export
+			entries.POST("/import", importExportHandler.Import)
+			entries.GET("/export", importExportHandler.Export)
+			entries.GET("/template", importExportHandler.Template)
+
 			entries.POST("", entryHandler.Create)
 			entries.POST("/random", entryHandler.Random)
 			entries.GET("/:id", entryHandler.Get)
