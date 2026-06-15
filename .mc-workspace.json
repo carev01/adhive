@@ -1,0 +1,12 @@
+{
+  "taskId": "3a11f19b-bb23-4d15-a239-b1b1ddb5b435",
+  "productId": "a934e865-1b60-47f3-978e-ea971efb2eca",
+  "createdAt": "2026-06-15T19:17:21.444Z",
+  "strategy": "worktree",
+  "branch": "autopilot/file-attachments-for-entries",
+  "baseBranch": "main",
+  "baseCommit": "9eb3d2e92de5aad8a1dbdccbd8a3c551ee8e936e",
+  "status": "active",
+  "agentId": "eb73069c-567e-4064-a8e8-9fa5b36c238a",
+  "isolatedPort": 4200
+}
