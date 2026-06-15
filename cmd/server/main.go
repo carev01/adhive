@@ -132,6 +132,7 @@ func main() {
 		&model.ArchiveRevision{},
 		&model.ArchiveAsset{},
 		&model.ThumbnailCandidate{},
+		&model.CustomField{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
@@ -152,6 +153,11 @@ func main() {
 		}
 	}
 
+	// Create custom_fields table
+	if err := migrations.V3CreateCustomFields(db); err != nil {
+		log.Printf("Warning: Failed to create custom_fields table: %v", err)
+	}
+
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
 	sessionRepo := repository.NewSessionRepository(db)
@@ -161,6 +167,7 @@ func main() {
 	archiveRevisionRepo := repository.NewArchiveRevisionRepository(db)
 	archiveAssetRepo := repository.NewArchiveAssetRepository(db)
 	thumbnailCandidateRepo := repository.NewThumbnailCandidateRepository(db)
+	customFieldRepo := repository.NewCustomFieldRepository(db)
 
 	// File storage
 	storageConfig := config.DefaultStorageConfig()
@@ -188,6 +195,8 @@ func main() {
 	tagHandler := handler.NewTagHandler(tagRepo)
 	interactionHandler := handler.NewInteractionHandler(interactionRepo, entryRepo)
 	archiveOpsHandler := handler.NewArchiveOpsHandler(archiveRevisionRepo, archiveAssetRepo, entryRepo, archiveWorker, storageConfig)
+	customFieldHandler := handler.NewCustomFieldHandler(customFieldRepo, entryRepo)
+	facetsHandler := handler.NewFacetsHandler(entryRepo, tagRepo, customFieldRepo)
 
 	// Initialize storage directories
 	if err := fileHandler.InitStorage(); err != nil {
@@ -198,7 +207,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(sessionRepo)
 
 	// Router setup
-	r := setupRouter(authHandler, entryHandler, tagHandler, interactionHandler, archiveOpsHandler, authMiddleware, fileHandler, thumbnailHandler)
+	r := setupRouter(authHandler, entryHandler, tagHandler, interactionHandler, archiveOpsHandler, customFieldHandler, facetsHandler, authMiddleware, fileHandler, thumbnailHandler)
 
 	// Create context with cancellation for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -264,7 +273,7 @@ func configureSQLite(db *gorm.DB) error {
 }
 
 // setupRouter configures all routes
-func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHandler, tagHandler *handler.TagHandler, interactionHandler *handler.InteractionHandler, archiveOpsHandler *handler.ArchiveOpsHandler, authMiddleware *middleware.AuthMiddleware, fileHandler *handler.FileHandler, thumbnailHandler *handler.ThumbnailHandler) *gin.Engine {
+func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHandler, tagHandler *handler.TagHandler, interactionHandler *handler.InteractionHandler, archiveOpsHandler *handler.ArchiveOpsHandler, customFieldHandler *handler.CustomFieldHandler, facetsHandler *handler.FacetsHandler, authMiddleware *middleware.AuthMiddleware, fileHandler *handler.FileHandler, thumbnailHandler *handler.ThumbnailHandler) *gin.Engine {
 	r := gin.Default()
 
 	// Enable gzip compression for responses > 1KB
@@ -335,11 +344,11 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 			entries.GET("", entryHandler.List)
 			entries.GET("/sources", entryHandler.Sources)
 			entries.GET("/locations", entryHandler.Locations)
+		entries.GET("/facets", facetsHandler.Facets)
 			entries.POST("/bulk/tag", entryHandler.BulkTag)
 			entries.POST("/bulk/delete", entryHandler.BulkDelete)
 			entries.POST("/bulk/archive", entryHandler.BulkArchive)
-			entries.POST("", entryHandler.Create)
-			entries.POST("/random", entryHandler.Random)
+
 			entries.GET("/:id", entryHandler.Get)
 			entries.PUT("/:id", entryHandler.Update)
 			entries.DELETE("/:id", entryHandler.Delete)
@@ -347,6 +356,12 @@ func setupRouter(authHandler *handler.AuthHandler, entryHandler *handler.EntryHa
 			// Tag associations
 			entries.POST("/:id/tags", tagHandler.AddEntryTag)
 			entries.DELETE("/:id/tags/:tagId", tagHandler.RemoveEntryTag)
+
+			// Custom fields
+			entries.GET("/:id/custom_fields", customFieldHandler.ListEntryCustomFields)
+			entries.POST("/:id/custom_fields", customFieldHandler.CreateEntryCustomField)
+			entries.PUT("/:id/custom_fields/:fieldId", customFieldHandler.UpdateEntryCustomField)
+			entries.DELETE("/:id/custom_fields/:fieldId", customFieldHandler.DeleteEntryCustomField)
 
 			// Interactions
 			entries.GET("/:id/interaction", interactionHandler.Get)
